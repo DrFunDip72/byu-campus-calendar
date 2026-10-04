@@ -22,7 +22,7 @@
  * timezone table is needed at request time.
  */
 
-import snapshot from '../src/data/events.json';
+import { readFileSync } from 'node:fs';
 
 interface FeedEvent {
   id: string;
@@ -42,7 +42,20 @@ interface FeedEvent {
   free: boolean;
 }
 
-const DATA = snapshot as unknown as {
+/**
+ * The snapshot is read off disk rather than `import`ed.
+ *
+ * This package is ESM (`"type": "module"`), and Vercel deploys this file as real ESM, where Node
+ * rejects a bare JSON import: `ERR_IMPORT_ATTRIBUTE_MISSING`. Vite's dev server transforms JSON
+ * imports for you, so a static import works locally and 500s in production — exactly the failure
+ * that is hardest to catch. `readFileSync` behaves identically in both.
+ *
+ * vercel.json pins `includeFiles` for this function so the file is bundled; without it, Vercel's
+ * dependency tracing has no static import to follow and would leave it out.
+ */
+const DATA = JSON.parse(
+  readFileSync(new URL('../src/data/events.json', import.meta.url), 'utf8')
+) as {
   generatedAt: string;
   groups: { id: string; label: string; interests: { id: string; label: string }[] }[];
   events: FeedEvent[];

@@ -4,10 +4,19 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/feed.ts": { "maxDuration": 15 }
+    "api/feed.ts": {
+      "maxDuration": 15,
+      "includeFiles": "src/data/events.json"
+    }
   },
   "rewrites": [
-    { "source": "/feed.ics", "destination": "/api/feed" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/feed.ics",
+      "destination": "/api/feed"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
