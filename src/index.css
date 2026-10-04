@@ -15,6 +15,23 @@
     --cat-wellness: #15803d;
     --cat-conference: #9a3412;
     --cat-other: #4b5563;
+
+    /*
+      Tokens lifted from calendar.byu.edu itself, for the Campus design.
+      Sources: the page's own inline custom properties (--grey), the hex values by frequency in its
+      markup, and the Brightspot stylesheet it loads. These are BYU's values, not approximations.
+    */
+    --byu-navy: #002e5d;
+    --byu-royal: #0057b8; /* most frequent blue in the page markup */
+    --byu-link: #0047ba; /* primaryLinkColor / buttonBgColor1 from the Events API payload */
+    --byu-skyblue: #afd6fe;
+    --byu-red: #ff1e3c;
+    --byu-grey: #f0efed; /* the page's own --grey */
+    --byu-rule: #e6e6e6;
+    --byu-rule-dark: #cccccc;
+    --byu-charcoal: #333333;
+    --byu-slate: #666666;
+    --byu-near-black: #141414;
   }
 
   html {
@@ -37,6 +54,17 @@
 }
 
 @layer utilities {
+  /* The Campus design's carousel rows scroll horizontally; the real site's Flickity carousel has
+     no visible scrollbar, and the prev/next buttons are the affordance instead. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;

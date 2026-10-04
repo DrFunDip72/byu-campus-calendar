@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "refresh": "node scripts/fetch-events.mjs --days 270",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "audit": "node scripts/audit-taxonomy.mjs"
   },
   "dependencies": {
     "date-fns": "^4.1.0",

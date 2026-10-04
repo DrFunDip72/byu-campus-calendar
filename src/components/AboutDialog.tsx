@@ -43,12 +43,14 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
 
         <section className="mb-6">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-            Three layouts, one dataset
+            Four layouts, one dataset
           </h3>
           <p className="mb-3 max-w-prose text-sm text-muted">
             Switch between them in the header. The data, search, filters and calendar export are
-            identical in all three — only the presentation changes, so a decision between them is a
-            decision about students, not about features.
+            identical in all four — only the presentation changes, so a decision between them is a
+            decision about students, not about features. <strong className="text-ink">BYU.edu</strong>{' '}
+            is a recreation of calendar.byu.edu&apos;s own layout, matched to that site&apos;s
+            stylesheet, so you can see this proposal inside the existing design system.
           </p>
           <ul className="flex flex-col gap-2">
             {DESIGNS.map((design) => {
@@ -91,7 +93,10 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
           </ul>
           <p className="text-xs leading-relaxed text-muted">
             {DATA.events.length} unique events after de-duplication, covering {DATA.windowDays} days.
-            All nine BYU calendar categories are included. Times are America/Denver. Last refreshed{' '}
+            We request <code className="rounded bg-canvas px-1">categories=all</code>, which reaches
+            events whose primary category is a department (School of Music, BRAVO! Events, Academic
+            Calendar) and which the nine main category ids silently miss. Times are America/Denver.
+            Last refreshed{' '}
             {updated.toLocaleString('en-US', { timeZone: 'America/Denver', dateStyle: 'medium', timeStyle: 'short' })} MT,
             and the snapshot re-pulls daily.
           </p>
@@ -105,11 +110,11 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
             {[
               [
                 'Club and association events',
-                'Clubs publish to CougarConnect and their own pages, which have no public API. This is the biggest gap: it is why "Hackathons" and "Study Abroad" currently show zero.'
+                'We searched all 626 records across 365 days: zero matches for hackathons or the Product Management Association. Clubs do not publish to the BYU calendar system at all — clubs.byu.edu has no public API, and Marriott’s club events have no feed. This is the biggest gap, and the reason those filters read zero.'
               ],
               [
                 'Most college and department calendars',
-                'Only 7 organizations publish a host name to the calendar API. The CS department is wired up as a proof that per-department sources merge cleanly; the other colleges each need the same treatment.'
+                'Only 11 organizations publish a usable host name to the calendar API. The CS department is wired up as a proof that per-department sources merge cleanly; the other colleges each need the same treatment.'
               ],
               [
                 'Intramurals and Y-Serve',

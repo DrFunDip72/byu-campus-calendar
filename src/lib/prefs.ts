@@ -17,6 +17,9 @@ import { EMPTY_FILTERS } from './types';
 
 const STORAGE_KEY = 'byu-campus-calendar.v1';
 
+/** Single list so a new design cannot be accepted by the URL but rejected by storage. */
+const DESIGN_IDS: DesignId[] = ['campus', 'feed', 'discover', 'planner'];
+
 interface StoredPrefs {
   interests: string[];
   myFeedOnly: boolean;
@@ -27,7 +30,7 @@ interface StoredPrefs {
 const DEFAULTS: StoredPrefs = {
   interests: [],
   myFeedOnly: true,
-  design: 'feed',
+  design: 'campus',
   saved: []
 };
 
@@ -39,7 +42,7 @@ function readStorage(): StoredPrefs {
     return {
       interests: Array.isArray(parsed.interests) ? parsed.interests.filter((x) => typeof x === 'string') : [],
       myFeedOnly: typeof parsed.myFeedOnly === 'boolean' ? parsed.myFeedOnly : true,
-      design: parsed.design === 'discover' || parsed.design === 'planner' ? parsed.design : 'feed',
+      design: DESIGN_IDS.includes(parsed.design as DesignId) ? (parsed.design as DesignId) : 'campus',
       saved: Array.isArray(parsed.saved) ? parsed.saved.filter((x) => typeof x === 'string') : []
     };
   } catch {
@@ -94,8 +97,8 @@ function filtersFromUrl(): Partial<Filters> | null {
 }
 
 export function designFromUrl(): DesignId | null {
-  const value = new URLSearchParams(window.location.search).get('design');
-  return value === 'feed' || value === 'discover' || value === 'planner' ? value : null;
+  const value = new URLSearchParams(window.location.search).get('design') as DesignId | null;
+  return value && DESIGN_IDS.includes(value) ? value : null;
 }
 
 /** Serializes filters into a query string, omitting anything at its default. */

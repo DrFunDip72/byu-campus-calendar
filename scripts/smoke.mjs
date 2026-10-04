@@ -61,7 +61,15 @@ function renderWith(search) {
 }
 
 console.log('\nDesigns render:');
-for (const design of ['feed', 'discover', 'planner']) {
+// The Campus design recreates calendar.byu.edu, so it carries BYU's own wording ("Events
+// Calendar") rather than ours. Each design asserts against the chrome it is supposed to render.
+const DESIGN_MARKERS = {
+  campus: 'Events Calendar',
+  feed: 'Campus Calendar',
+  discover: 'Campus Calendar',
+  planner: 'Campus Calendar'
+};
+for (const [design, marker] of Object.entries(DESIGN_MARKERS)) {
   let html = '';
   let error = null;
   try {
@@ -70,7 +78,9 @@ for (const design of ['feed', 'discover', 'planner']) {
     error = err;
   }
   check(`${design} renders`, !error && html.length > 5000, error?.message ?? `${html.length} bytes`);
-  check(`${design} shows the switcher`, html.includes('Campus Calendar'));
+  check(`${design} shows its own chrome`, html.includes(marker));
+  // Every design must offer the layout switcher, or there is no way back out of it.
+  check(`${design} offers the layout switcher`, html.includes('BYU.edu') && html.includes('Planner'));
 }
 
 console.log('\nFilters narrow results:');
@@ -101,6 +111,15 @@ check(
 
 const multi = renderWith('?design=planner&interests=football,dance');
 check('planner renders a multi-interest selection', multi.includes('Planner') || multi.length > 5000);
+
+// The Campus design recreates calendar.byu.edu, so its markers are BYU's, not ours.
+const campus = renderWith('?design=campus');
+check('campus renders the BYU chrome', campus.includes('Events Calendar') && campus.includes('Submit an Event'));
+check('campus renders the BYU footer', campus.includes('All Rights Reserved'));
+check('campus labels itself a prototype', campus.includes('Prototype'));
+check('campus groups into category rows', campus.includes('Full Schedule'));
+const campusFiltered = renderWith('?design=campus&interests=football');
+check('campus respects interest filters', campusFiltered.includes('Football vs.') && !campusFiltered.includes('Basketball vs.'));
 
 const freeHtml = renderWith('?design=discover&free=1');
 check('discover renders with freeOnly', freeHtml.length > 5000);

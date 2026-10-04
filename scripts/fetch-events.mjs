@@ -20,10 +20,21 @@ import { deriveInterests, deriveOrgs, INTEREST_GROUPS, FALLBACK_INTERESTS } from
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'src', 'data', 'events.json');
 
-// All nine categories from https://calendar.byu.edu/api/Categories. The hackathon project used only
-// 49+4+1006 (Student Life, Education, Conferences) because it wanted career events; a comprehensive
-// campus calendar needs every one of them, and Athletics (10) is where the football games live.
-const CATEGORIES = ['4', '1006', '7', '9', '10', '47', '49', '52', '6'];
+/**
+ * `categories=all`, per the official docs at calendar.byu.edu/events-api.
+ *
+ * This replaced an explicit list of the nine main category ids from /api/Categories. The docs claim
+ * "including all main categories means to include all events (as one main level category is
+ * required for all events)" — **that is not true in practice.** Measured over the same week, the
+ * nine main ids return 35 events and `all` returns 40. The extras have a non-main category as their
+ * primary one: "School of Music" (Jazz Showcase, OcTUBAfest, Fall Choral Showcase), "BRAVO! Events",
+ * and "Academic Calendar" deadlines. Over 365 days this is the difference between 404 and 626 raw
+ * records — a ~55% undercount that failed silently.
+ *
+ * /api/AllCategories documents the three category types behind this: main categories, tags, and
+ * internal categories (departments and groups).
+ */
+const CATEGORIES = 'all';
 const DAY_MS = 86_400_000;
 const CHUNK_DAYS = 7; // keeps every window well under the ~100-event response cap
 const DAYS = Number(process.argv[process.argv.indexOf('--days') + 1]) || 270;
@@ -103,7 +114,7 @@ async function fetchByuCalendar(days) {
     const min = new Date(today.getTime() + offset * DAY_MS);
     const max = new Date(today.getTime() + Math.min(offset + CHUNK_DAYS, days) * DAY_MS);
     const url =
-      `https://calendar.byu.edu/api/Events.json?categories=${CATEGORIES.join('+')}` +
+      `https://calendar.byu.edu/api/Events.json?categories=${CATEGORIES}` +
       `&event%5Bmin%5D%5Bdate%5D=${ymd(min)}&event%5Bmax%5D%5Bdate%5D=${ymd(max)}`;
     let items;
     try {

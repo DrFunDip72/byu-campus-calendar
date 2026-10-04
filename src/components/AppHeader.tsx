@@ -1,4 +1,12 @@
-import { Info, LayoutGrid, List, Rss, CalendarDays, SlidersHorizontal } from 'lucide-react';
+import {
+  Info,
+  LayoutGrid,
+  List,
+  Rss,
+  CalendarDays,
+  SlidersHorizontal,
+  GraduationCap
+} from 'lucide-react';
 import type { DesignId } from '../lib/types';
 import { SearchInput } from './InterestPanel';
 
@@ -9,6 +17,12 @@ import { SearchInput } from './InterestPanel';
  * would defeat that.
  */
 export const DESIGNS: { id: DesignId; label: string; icon: typeof List; blurb: string }[] = [
+  {
+    id: 'campus',
+    label: 'BYU.edu',
+    icon: GraduationCap,
+    blurb: "calendar.byu.edu's own layout, carrying this data"
+  },
   { id: 'feed', label: 'Feed', icon: List, blurb: 'A dense, scannable list grouped by day' },
   { id: 'discover', label: 'Discover', icon: LayoutGrid, blurb: 'Image-led cards for browsing' },
   { id: 'planner', label: 'Planner', icon: CalendarDays, blurb: 'A month grid for planning' }

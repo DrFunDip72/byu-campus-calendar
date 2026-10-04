@@ -42,6 +42,24 @@ export default {
         muted: '#5a6779',
         line: '#e3e7ee',
         canvas: '#f6f8fb',
+        /*
+         * BYU's own values, read off calendar.byu.edu (see src/index.css for provenance).
+         * Used by the Campus design, which recreates that site's chrome, and kept separate from
+         * the `navy`/`royal` scales above so tuning our designs can never drift BYU's.
+         */
+        byu: {
+          navy: '#002e5d',
+          royal: '#0057b8',
+          link: '#0047ba',
+          sky: '#afd6fe',
+          red: '#ff1e3c',
+          grey: '#f0efed',
+          rule: '#e6e6e6',
+          ruleDark: '#cccccc',
+          charcoal: '#333333',
+          slate: '#666666',
+          black: '#141414'
+        },
         // Category accents (Planner chips, Discover rails)
         cat: {
           athletics: '#0047BA',

@@ -45,7 +45,7 @@ export interface EventSnapshot {
   events: CampusEvent[];
 }
 
-export type DesignId = 'feed' | 'discover' | 'planner';
+export type DesignId = 'campus' | 'feed' | 'discover' | 'planner';
 
 export type DateRangeId = 'today' | 'weekend' | 'week' | 'month' | 'all';
 

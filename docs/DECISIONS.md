@@ -27,15 +27,10 @@ already check.
 
 | Source | Mechanism | Status | Volume |
 | --- | --- | --- | --- |
-| `calendar.byu.edu` | Public JSON API (`/api/Events.json`) | **Live** | 404 records → 383 unique |
+| `calendar.byu.edu` | Public JSON API (`/api/Events.json?categories=all`) | **Live** | 642 records → 621 unique |
 | `cs.byu.edu` | Per-event ICS files linked from the dept calendar | **Live** | 2 records |
 
-The main calendar API is the backbone. It exposes nine categories — we pull **all nine**:
-
-```
-Education (4) · Conferences (1006) · Devotionals & Forums (7) · Arts & Entertainment (9)
-Athletics (10) · Health & Wellness (47) · Student Life (49) · Other (52) · Major Conferences (6)
-```
+The main calendar API is the backbone, and we request `categories=all`.
 
 > **Trade-off we reversed from the prior project.** The hackathon project this grew out of pulled
 > only three categories (`49+4+1006`) because it only wanted career events, and it actively
@@ -43,11 +38,18 @@ Athletics (10) · Health & Wellness (47) · Student Life (49) · Other (52) · M
 > the product. Athletics (category 10) in particular is where every football and basketball game
 > lives, and it was not being pulled at all.
 
+> **A second undercount we then found in our own code.** Our first version listed the nine main
+> category ids explicitly. BYU's docs claim that is equivalent to `categories=all`; it is not.
+> Events whose *primary* category is a department ("School of Music", "BRAVO! Events", "Academic
+> Calendar") are unreachable that way, and the request still returns a plausible 200. Switching to
+> `categories=all` took the pull from 404 to 642 raw records — a ~55% silent undercount.
+> Full write-up: [`DATA-INVESTIGATION.md`](DATA-INVESTIGATION.md).
+
 ### Why the API has to be windowed
 
 The API caps each response at roughly 100 events. A naive 9-month request silently returns a
 truncated list — the worst kind of bug, because it looks like it worked. We request **one week at a
-time** (39 requests for 270 days) and log a warning if any single window comes back at 100+, so
+time** (53 requests for 365 days) and log a warning if any single window comes back at 100+, so
 truncation can never happen silently.
 
 ### What we do *not* cover, and why it matters
@@ -56,8 +58,8 @@ This is the honest part, and it is surfaced in the product itself under the info
 
 | Gap | Why | Impact |
 | --- | --- | --- |
-| **Club and association events** | Clubs publish to CougarConnect and their own pages. No public API. | **The biggest gap.** It is why "Hackathons" and "Study Abroad" show zero events. A Product Management Association meeting is exactly the kind of event this product should carry and currently cannot. |
-| **Most college/department calendars** | Only 7 organizations publish a host name to the API. | CS is wired up to prove per-department sources merge cleanly. Each other college needs the same ~40 lines. |
+| **Club and association events** | Not published to the BYU calendar system at all. `clubs.byu.edu` is a Mendix SPA with no public API; Marriott's club events are per-event HTML with no feed. **Verified: 0 matches for hackathon or PMA across 626 records / 365 days.** | **The biggest gap.** It is why "Hackathons" and "Study Abroad" show zero. See [`DATA-INVESTIGATION.md`](DATA-INVESTIGATION.md) for every source probed. BYU already runs a public "Submit an Event" form, so the pipe exists — the gap is adoption, not technology. |
+| **Most college/department calendars** | Only 11 organizations publish a usable host name to the API. | CS is wired up to prove per-department sources merge cleanly. Each other college needs the same ~40 lines. |
 | **Intramurals, Y-Serve** | Separate systems. | Significant student-life volume missing. |
 | **A student's class schedule** | Needs BYU sign-in. | Highest-value *addition*: it would let the calendar hide events that collide with classes. |
 
@@ -94,19 +96,26 @@ cost, and a failure mode, and buys nothing until there is per-user state or writ
 
 The API gives us two grouping fields, and **neither is a filter a student would want**:
 
-- `CategoryName` — 9 values. Too coarse. Nobody follows "Athletics"; they follow *football*.
-- `DeptNames` — 10 distinct values across 270 days, and **128 of 385 events are just
-  "Ticketed Events"**, a publishing bucket, not an organization.
+- `CategoryName` — 9 main values (plus department categories). Too coarse. Nobody follows
+  "Athletics"; they follow *football*.
+- `DeptNames` — 15 distinct values across the window, of which only 11 are real organizations, and
+  **234 of 623 events are just "Ticketed Events"**, a publishing bucket rather than a host.
 
-So we derive a third layer: **~45 student-facing "interests"** across four groups, matched from the
-title, tags and description by an ordered keyword ruleset in `scripts/taxonomy.mjs`.
+So we derive a third layer: **~50 student-facing "interests"** across five groups, matched from the
+title, category, tags and description by an ordered keyword ruleset in `scripts/taxonomy.mjs`.
 
 ```
 Athletics        Football · Men's/Women's Basketball · Volleyball · Soccer · Softball · Rugby · …
 Arts             Dance · Theatre · Film · Music · Visual Arts
 Career           Career Fairs · Hackathons · Info Sessions · Lectures · Research · Workshops
 Student Life     FHE · Clubs · Socials · Crafts · Service · Outdoors · Devotionals · Wellness · …
+Academic Dates   Finals & Exams · Holidays & Breaks · Term Start & End · Graduation · Orientation
 ```
+
+The **Academic Dates** group was added after the `categories=all` fix surfaced BYU's Academic
+Calendar department: 69 events — finals, holidays, term boundaries, commencement — had all been
+landing in the catch-all. "When do finals start" is core campus-calendar usage, so they got real
+filters. The catch-all dropped from 69 events to 8.
 
 **Design choices inside the taxonomy:**
 
@@ -147,28 +156,58 @@ in the UI turns a weakness into the specific, actionable ask in §2.
 
 ---
 
-## 6. Three designs, one engine
+## 6. Four designs, one engine
 
-The three layouts are **presentation only**. Data, search, filtering, preferences, and calendar
+The four layouts are **presentation only**. Data, search, filtering, preferences, and calendar
 export are identical and shared. A decision between them is a decision about students, not features.
 
-| | **Feed** (default) | **Discover** | **Planner** |
-| --- | --- | --- | --- |
-| **Thesis** | "What's on today?" | "Show me something good" | "What does my month look like?" |
-| **Form** | Dense day-grouped list, fixed time gutter, 56px thumbnails | Image-led cards, featured lead, horizontal rails | Month grid + sticky day panel |
-| **Events per screen** | ~12 | ~4 | ~30 (titles only) |
-| **Best at** | Answering a specific question fast | Discovery; serendipity | Density, conflicts, planning |
-| **Worst at** | Making an unknown event look appealing | Information density; favours events with good artwork | Discovery; needs real screen width |
-| **Would suit** | The default for a logged-in student | A homepage, or digital signage | A planning tool, or an advisor's view |
+| | **BYU.edu** (default) | **Feed** | **Discover** | **Planner** |
+| --- | --- | --- | --- | --- |
+| **Thesis** | "What would this look like on our site?" | "What's on today?" | "Show me something good" | "What does my month look like?" |
+| **Form** | Recreation of calendar.byu.edu: navy section bars, carousel rows of promo cards | Dense day-grouped list, fixed time gutter, 56px thumbnails | Image-led cards, featured lead, horizontal rails | Month grid + sticky day panel |
+| **Events per screen** | ~3 per row, rows stacked | ~12 | ~4 | ~30 (titles only) |
+| **Best at** | Showing leadership the idea inside their own design system | Answering a specific question fast | Discovery; serendipity | Density, conflicts, planning |
+| **Worst at** | Density — a carousel hides most of the row behind a click | Making an unknown event look appealing | Information density; favours events with good artwork | Discovery; needs real screen width |
+| **Would suit** | The actual calendar.byu.edu home page | The default for a logged-in student | A homepage, or digital signage | A planning tool, or an advisor's view |
 
-**Why Feed is the default:** most visits are a specific question with a time pressure behind it.
-Discovery is the second visit, not the first.
+**Why BYU.edu is the default:** this build's first job is a pitch. Opening on BYU's own layout makes
+the first question "should we do this" rather than "would this fit our site". The other three then
+show what becomes possible once the data is unified.
+
+**Why Feed is the best default for students:** most real visits are a specific question with time
+pressure behind it. Discovery is the second visit, not the first.
+
+### The BYU.edu design is matched, not approximated
+
+Every value came from the live site, not from a screenshot:
+
+- Section heading: navy `#002e5d` bar, white, 16px/1.6, bold, letter-spacing 1px, padding-left 5px
+  (`.ListCardImageOnTopRow > .ListCardImageOnTop-title`).
+- Card date/time: 11px, weight 300, letter-spacing .5px, uppercase, charcoal
+  (`.PromoCardImageOnTop-eventDate`).
+- Card title 20px, description 14px; drop shadow on the **image**, not the card:
+  `0 10px 20px rgba(0,0,0,.05)`.
+- Carousel buttons: 30px, square, 1px outline, fill on hover, 50% opacity when disabled
+  (`.btn-carousel`).
+- Palette by frequency in the real markup: `#002e5d`, `#0057b8`, `#0047ba`, `#afd6fe`, `#ff1e3c`,
+  `#f0efed`. Type is IBM Plex Sans, which the site loads from Google Fonts.
+- Footer: the real four column groups and the real legal line.
+
+One rule was deliberately **not** copied: `.PromoCardImageOnTop { border: 2px solid #000 }` sits
+inside an `@media print` block on the real site, so applying it on screen would have been wrong.
+
+Two deliberate departures, both flagged in the UI:
+
+1. **A near-black "Prototype" strip** sits above the BYU header, styled unlike BYU on purpose, so
+   nobody mistakes the recreation for the real page. It holds the layout switcher and our controls.
+2. **Add-to-calendar buttons on every card**, which the real site has no equivalent of. It is the
+   clearest single thing this proposal adds to the page BYU already has.
 
 **Why Discover is viable at all:** 349 of 385 events carry an `ImgUrl`. BYU already publishes event
 artwork, and an image-led design built on a dataset without images would be a mock, not a prototype.
 
-**Why all three are always visible in the header**, rather than one shipping and two in a deck: the
-point of this build is to let people compare them against real data in one sitting.
+**Why all four are always visible in the header**, rather than one shipping and three in a deck:
+the point of this build is to let people compare them against real data in one sitting.
 
 ---
 
@@ -278,9 +317,10 @@ eight visually separable chips and navy-on-navy is unreadable. Each is darkened 
 ## 12. Testing
 
 No browser automation was available, so `scripts/smoke.mjs` server-renders the real `App` against
-the real snapshot through `react-dom/server` and asserts behaviour, not just absence of crashes:
+the real snapshot through `react-dom/server` and asserts behaviour, not just absence of crashes
+(29 checks):
 
-- all three designs render
+- all four designs render, each with its own chrome, and each still offers the layout switcher
 - a `football` filter shows football and **excludes basketball**
 - search for "notre dame" finds the game
 - a hopeless search shows the empty state
@@ -290,6 +330,21 @@ the real snapshot through `react-dom/server` and asserts behaviour, not just abs
 
 Run with `npm run smoke`. It is a real gate, not a formality — it caught the orphaned-interest class
 of bug during development.
+
+`npm run audit` is the second tool, and the more interesting one: it reports, per interest rule, how
+many of its matches come from a **structural** field (title or category) versus only from free text
+(tags or description). A rule matching almost nothing structurally is usually matching boilerplate.
+It found three real false-positive classes that no type checker or render test would have caught:
+
+- **all 20** "Research" matches were Harold B. Lee Library boilerplate on Craft Night listings
+- **31** FHE and craft events were tagged Visual Arts for being held "at the Education in Zion Gallery"
+- a stray tag had put the **Homecoming Dance** in the golf feed
+
+The fix was to give rules a **scope**. Sports and academic dates match structural fields only;
+place words like "gallery" and "library" are topical interests, while browsing *by venue* is what
+the organization filter is for. An unknown scope now throws, because the first version silently
+handed `undefined` to the matcher and dropped two interests to zero events — and a classifier that
+returns nothing looks exactly like a campus with nothing scheduled.
 
 ---
 
