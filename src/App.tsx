@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
-import { CalendarX2, Info, Plus, Rss, SlidersHorizontal, X } from 'lucide-react';
-import { AppHeader, DESIGNS } from './components/AppHeader';
+import { CalendarX2, Plus, SlidersHorizontal, X } from 'lucide-react';
+import { AppHeader } from './components/AppHeader';
 import { AboutDialog } from './components/AboutDialog';
-import { ByuFooter, ByuHeader } from './components/ByuChrome';
+import { ByuFeatureBar, ByuFooter, ByuHeader } from './components/ByuChrome';
 import { EventDetail } from './components/EventDetail';
+import { InstallPrompt } from './components/InstallPrompt';
 import { SubscribeDialog } from './components/SubscribeDialog';
+import { ViewSwitcher, ViewsSheet } from './components/ViewSwitcher';
 import { ActiveFilterBar, InterestPanel } from './components/InterestPanel';
+import { ByuAppView } from './views/ByuAppView';
 import { CampusView } from './views/CampusView';
 import { FeedView } from './views/FeedView';
 import { DiscoverView } from './views/DiscoverView';
@@ -13,18 +16,31 @@ import { PlannerView } from './views/PlannerView';
 import { applyFilters } from './lib/filters';
 import { DATA, EVENTS, INTEREST_LABELS } from './lib/data';
 import { usePreferences } from './lib/prefs';
-import type { CampusEvent, DesignId } from './lib/types';
+import { viewById } from './lib/views';
+import type { CampusEvent } from './lib/types';
 
 export default function App() {
-  const { design, setDesign, filters, patch, toggleInterest, toggleOrg, clearFilters, saved, toggleSaved } =
-    usePreferences();
+  const {
+    view,
+    setView,
+    appMode,
+    setAppMode,
+    filters,
+    patch,
+    toggleInterest,
+    toggleOrg,
+    clearFilters,
+    saved,
+    toggleSaved
+  } = usePreferences();
 
   const [detail, setDetail] = useState<CampusEvent | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-  /** Campus design only: which BYU category the nav has drilled into. */
-  const [campusCategory, setCampusCategory] = useState<string | null>(null);
+  const [viewsOpen, setViewsOpen] = useState(false);
+  /** BYU Website surface only: which BYU category the nav has drilled into. */
+  const [webCategory, setWebCategory] = useState<string | null>(null);
 
   // Recomputed on every filter or query change. The snapshot is small enough that filtering on
   // each keystroke is imperceptible, so there is no debounce — results move as the student types.
@@ -66,6 +82,31 @@ export default function App() {
     </p>
   );
 
+  const emptyState = (
+    <EmptyState
+      hasFilters={activeFilterCount > 0 || filters.query !== ''}
+      onClear={() => {
+        clearFilters();
+        patch({ interests: [], query: '' });
+      }}
+    />
+  );
+
+  /** Rendered on every surface, so the switcher, filters and dialogs are always reachable. */
+  const shell = (
+    <>
+      <ViewSwitcher
+        view={view}
+        onViewChange={setView}
+        onOpenFilters={() => setFiltersOpen(true)}
+        onOpenSubscribe={() => setSubscribeOpen(true)}
+        onOpenAbout={() => setAboutOpen(true)}
+        onOpenViews={() => setViewsOpen(true)}
+        activeFilterCount={activeFilterCount}
+      />
+    </>
+  );
+
   const dialogs = (
     <>
       <EventDetail
@@ -78,75 +119,59 @@ export default function App() {
         open={subscribeOpen}
         onClose={() => setSubscribeOpen(false)}
         filters={filters}
-        design={design}
+        view={view}
         events={events}
       />
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <ViewsSheet
+        open={viewsOpen}
+        current={view}
+        onSelect={setView}
+        onClose={() => setViewsOpen(false)}
+      />
       {filtersOpen && (
-        <FilterSheet
-          onClose={() => setFiltersOpen(false)}
-          count={events.length}
-          alwaysAvailable={design === 'campus'}
-        >
+        <FilterSheet onClose={() => setFiltersOpen(false)} count={events.length}>
           {panel}
         </FilterSheet>
       )}
+      <InstallPrompt />
     </>
   );
 
   // ---------------------------------------------------------------------------
-  // Campus design: BYU's own chrome, so leadership sees this on their site.
-  // The design switcher moves into a slim strip above the BYU header, visually separated and
-  // labelled, so the page below it can be a faithful recreation rather than a hybrid.
+  // BYU Website — their chrome, our features.
   // ---------------------------------------------------------------------------
-  if (design === 'campus') {
+  if (view === 'web') {
     return (
       <div className="flex min-h-screen flex-col bg-white font-sans text-byu-charcoal">
-        <PrototypeBar
-          design={design}
-          setDesign={setDesign}
-          onOpenFilters={() => setFiltersOpen(true)}
-          onOpenSubscribe={() => setSubscribeOpen(true)}
-          onOpenAbout={() => setAboutOpen(true)}
-          activeFilterCount={activeFilterCount}
-        />
-
+        {shell}
         <ByuHeader
-          activeCategory={campusCategory}
-          onSelectCategory={setCampusCategory}
+          activeCategory={webCategory}
+          onSelectCategory={setWebCategory}
           query={filters.query}
           onQueryChange={(query) => patch({ query })}
         />
+        <ByuFeatureBar
+          filters={filters}
+          patch={patch}
+          toggleInterest={toggleInterest}
+          onOpenFilters={() => setFiltersOpen(true)}
+          onOpenSubscribe={() => setSubscribeOpen(true)}
+          resultCount={events.length}
+        />
 
         <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6">
-          {(activeFilterCount > 0 || filters.query) && (
-            <div className="mb-4 flex flex-col gap-2">
-              <ActiveFilterBar
-                filters={filters}
-                patch={patch}
-                toggleInterest={toggleInterest}
-                toggleOrg={toggleOrg}
-              />
-              {emptyNotice}
-            </div>
-          )}
-
+          {emptyNotice && <div className="mb-4">{emptyNotice}</div>}
           {events.length === 0 ? (
-            <EmptyState
-              hasFilters={activeFilterCount > 0 || filters.query !== ''}
-              onClear={() => {
-                clearFilters();
-                patch({ interests: [], query: '' });
-              }}
-            />
+            emptyState
           ) : (
             <CampusView
               events={events}
               onOpen={setDetail}
               saved={saved}
               onSave={toggleSaved}
-              activeCategory={campusCategory}
-              onSelectCategory={setCampusCategory}
+              activeCategory={webCategory}
+              onSelectCategory={setWebCategory}
             />
           )}
         </main>
@@ -158,24 +183,58 @@ export default function App() {
   }
 
   // ---------------------------------------------------------------------------
-  // The three original designs share our own chrome and a persistent filter rail.
+  // BYU App — their mobile Calendar tab, rebuilt around interests.
+  // ---------------------------------------------------------------------------
+  if (view === 'app') {
+    return (
+      <div className="flex min-h-screen flex-col bg-app-bg font-sans">
+        {shell}
+        <main className="flex flex-1 flex-col items-center px-0 py-0 sm:px-4 sm:py-6">
+          {/* On a wide screen the app renders inside a phone frame with a caption, because a
+              full-bleed "mobile app" on a projector reads as a website. */}
+          <div className="hidden w-full max-w-[420px] pb-3 text-center sm:block">
+            <p className="text-xs text-white/50">
+              The BYU app’s Calendar tab, rebuilt. Four layouts, interest filters, one-tap calendar
+              add.
+            </p>
+          </div>
+          <ByuAppView
+            events={events}
+            onOpen={setDetail}
+            saved={saved}
+            onSave={toggleSaved}
+            mode={appMode}
+            onModeChange={setAppMode}
+            onOpenFilters={() => setFiltersOpen(true)}
+            query={filters.query}
+            onQueryChange={(query) => patch({ query })}
+            activeFilterCount={activeFilterCount}
+          />
+          {emptyNotice && <div className="w-full max-w-[420px] px-3 pt-3">{emptyNotice}</div>}
+        </main>
+        {dialogs}
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Our concepts — shared chrome with a persistent filter rail.
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-canvas font-sans text-ink">
+      {shell}
       <AppHeader
-        design={design}
-        setDesign={setDesign}
+        title={viewById(view).title}
         query={filters.query}
         setQuery={(query) => patch({ query })}
         onOpenFilters={() => setFiltersOpen(true)}
         onOpenSubscribe={() => setSubscribeOpen(true)}
-        onOpenAbout={() => setAboutOpen(true)}
         activeFilterCount={activeFilterCount}
       />
 
       <div className="mx-auto flex max-w-[1400px] gap-6 px-4 py-4 sm:px-6">
         <aside className="hidden w-[268px] shrink-0 lg:block">
-          <div className="sticky top-[112px] max-h-[calc(100vh-128px)] overflow-y-auto pb-6 pr-1">
+          <div className="sticky top-[120px] max-h-[calc(100vh-140px)] overflow-y-auto pb-6 pr-1">
             {panel}
           </div>
         </aside>
@@ -192,16 +251,10 @@ export default function App() {
           </div>
 
           {events.length === 0 ? (
-            <EmptyState
-              hasFilters={activeFilterCount > 0 || filters.query !== ''}
-              onClear={() => {
-                clearFilters();
-                patch({ interests: [], query: '' });
-              }}
-            />
-          ) : design === 'feed' ? (
+            emptyState
+          ) : view === 'feed' ? (
             <FeedView events={events} onOpen={setDetail} saved={saved} onSave={toggleSaved} />
-          ) : design === 'discover' ? (
+          ) : view === 'discover' ? (
             <DiscoverView events={events} onOpen={setDetail} saved={saved} onSave={toggleSaved} />
           ) : (
             <PlannerView events={events} onOpen={setDetail} saved={saved} onSave={toggleSaved} />
@@ -230,107 +283,17 @@ export default function App() {
   );
 }
 
-/**
- * The strip above the BYU header in the Campus design.
- *
- * Deliberately styled *unlike* BYU — near-black, small, dense — so nobody mistakes it for part of
- * the page being proposed. It says in one line that the chrome below is a recreation, which is the
- * honest framing for showing leadership a mock of their own site.
- */
-function PrototypeBar({
-  design,
-  setDesign,
-  onOpenFilters,
-  onOpenSubscribe,
-  onOpenAbout,
-  activeFilterCount
-}: {
-  design: DesignId;
-  setDesign: (d: DesignId) => void;
-  onOpenFilters: () => void;
-  onOpenSubscribe: () => void;
-  onOpenAbout: () => void;
-  activeFilterCount: number;
-}) {
-  return (
-    <div className="sticky top-0 z-40 bg-byu-black text-white">
-      <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-1.5 sm:px-6">
-        <span className="hidden text-[10px] font-bold uppercase tracking-[0.1em] text-white/50 sm:inline">
-          Prototype
-        </span>
-
-        <nav aria-label="Choose a layout" className="flex items-center gap-0.5">
-          {DESIGNS.map((option) => {
-            const Icon = option.icon;
-            const on = design === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setDesign(option.id)}
-                aria-current={on}
-                title={option.blurb}
-                className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold transition-colors ${
-                  on ? 'bg-white text-byu-black' : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <Icon className="h-3 w-3" aria-hidden />
-                {option.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onOpenFilters}
-            className="relative inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10 hover:text-white"
-          >
-            <SlidersHorizontal className="h-3 w-3" aria-hidden />
-            My interests
-            {activeFilterCount > 0 && (
-              <span className="ml-0.5 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-byu-red px-1 text-[9px] font-bold text-white">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={onOpenSubscribe}
-            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10 hover:text-white"
-          >
-            <Rss className="h-3 w-3" aria-hidden />
-            Subscribe
-          </button>
-          <button
-            type="button"
-            onClick={onOpenAbout}
-            aria-label="About this prototype and its data sources"
-            className="p-1 text-white/70 hover:text-white"
-          >
-            <Info className="h-3.5 w-3.5" aria-hidden />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function FilterSheet({
   onClose,
   count,
-  alwaysAvailable,
   children
 }: {
   onClose: () => void;
   count: number;
-  /** The Campus design has no filter rail at any width, so its sheet is not breakpoint-limited. */
-  alwaysAvailable: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className={`fixed inset-0 z-50 flex ${alwaysAvailable ? '' : 'lg:hidden'}`}>
+    <div className="fixed inset-0 z-[55] flex">
       <div className="absolute inset-0 bg-ink/40" onClick={onClose} aria-hidden />
       <div
         role="dialog"

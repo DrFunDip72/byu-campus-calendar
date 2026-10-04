@@ -43,9 +43,21 @@ export default {
         line: '#e3e7ee',
         canvas: '#f6f8fb',
         /*
-         * BYU's own values, read off calendar.byu.edu (see src/index.css for provenance).
-         * Used by the Campus design, which recreates that site's chrome, and kept separate from
-         * the `navy`/`royal` scales above so tuning our designs can never drift BYU's.
+         * BYU mobile app palette, sampled pixel-by-pixel from a screen recording of the real app
+         * (frames extracted with ffmpeg, colours read out of the raw RGB buffer rather than
+         * eyeballed). Used by the BYU App surface.
+         */
+        app: {
+          bg: '#041730',      // page background
+          card: '#0A2D57',    // event cards
+          bar: '#01192C',     // week strip and bottom tab bar
+          green: '#076940',   // month header
+          sky: '#AFD6FE'      // secondary text on dark
+        },
+        /*
+         * BYU's own website values, read off calendar.byu.edu (see src/index.css for provenance).
+         * Used by the BYU Website surface, and kept separate from the `navy`/`royal` scales above
+         * so tuning our own designs can never drift BYU's.
          */
         byu: {
           navy: '#002e5d',

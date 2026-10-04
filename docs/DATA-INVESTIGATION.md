@@ -4,8 +4,9 @@
 Was the data hardcoded instead of pulled from the API endpoint?
 
 **Short answer:** nothing was hardcoded — but the ingest *was* under-pulling the API by ~55%, for a
-different reason, and that is now fixed. PMA and hackathon events are genuinely not in the BYU
-calendar API at all, which is a BYU data-publishing gap rather than a bug in this project.
+different reason, and that is now fixed. PMA and hackathon events are genuinely not on the public
+calendar API. **They are, however, in BYU's own mobile app** (§3), which turns the ask from "get
+clubs to start publishing" into "give us read access to the feed you already run".
 
 ---
 
@@ -96,7 +97,29 @@ Two further changes were needed to handle the wider pull:
   which is where "School of Music" and "BRAVO! Events" as org names come from. `Suggested - *`
   placement buckets and `STREAMING` are filtered out as noise.
 
-## 3. PMA and hackathons are not in the API
+## 3. PMA and hackathons are not in the *public* API — but BYU already has them
+
+> **Correction, added after reviewing a screen recording of the BYU mobile app.** An earlier version
+> of this document concluded that clubs "do not publish to the BYU calendar system at all" and that
+> the gap was adoption. That was wrong, and the correction makes the ask far stronger.
+>
+> The BYU app's Calendar tab shows club events that the public API does not return — verified
+> against the recording: **Masterclass with Percuity** (Marketing Association), **Pre-Nursing
+> Association Meeting**, **CSA Emphasis Meeting** (Cybersecurity Students Academic Association),
+> **Recruiting Academy** (Investment Banking Association). The app's event detail screen even has a
+> dedicated **Club** field, so club affiliation is a first-class column in whatever backs it.
+>
+> None of those four appear anywhere in our 626-record pull.
+>
+> **So the data exists, inside BYU, today.** It is simply not on the public endpoint. The ask is no
+> longer "please get clubs to start publishing" — it is "please point this at the same feed your own
+> app already uses," which is a far smaller request.
+>
+> We did not reverse-engineer that endpoint. It is not in the public documentation, `api.byu.edu`
+> rejects unauthenticated requests, and probing an authenticated internal API without permission is
+> not something to do on the way into a partnership conversation.
+
+### The public API genuinely does not carry them
 
 Searched the **full 365-day pull with `categories=all`** — 626 raw records — across `Title`,
 `Description`, `ShortDescription`, `TagsNames`, `DeptNames` and `CategoryName`:
@@ -118,17 +141,19 @@ This is consistent with the prior hackathon project, which found a real hackatho
 | --- | --- | --- |
 | **cs.byu.edu** | Department events incl. hackathons | ✅ **Already ingested.** Each event page links a structured `.ics` file. Currently 2 events. |
 | **marriott.byu.edu/event** | Marriott School club and association events — the likely home of PMA | Per-event HTML pages with **no ICS, no JSON-LD, no feed**, and dates not in parseable plain text. Needs a bespoke per-page scraper or an LLM extraction step. Fragile. |
+| **The BYU mobile app** | Club events *with* a dedicated Club field — Marketing Association, Pre-Nursing, Investment Banking Association | **Confirmed to exist.** Endpoint is not public and not documented; `api.byu.edu` rejects unauthenticated calls. This is the feed to ask for. |
 | **clubs.byu.edu** | The official Student Organizations directory | A **Mendix** single-page app (`mxclientsystem/mxui.js`). No public REST API; data arrives over a proprietary client protocol. Not practically scrapeable. |
 | **CougarConnect / CampusLabs** | Club events at many universities | BYU does not appear to expose the standard Engage discovery API — `byu.campuslabs.com/engage/*` returns 404. |
 
-**The important point for the pitch:** BYU already operates the pipe. `calendar.byu.edu` has a
-public **Submit an Event** form, and the API docs note that a department can publish through the BYU
-Calendar system while choosing not to display on `calendar.byu.edu`
-(the `IsPublishedNotMainCalendar` field exists for exactly this). So clubs *could* publish into the
-system this project already reads. The gap is adoption and policy, not technology.
+**The important point for the pitch:** BYU already operates the pipe *and already fills it*. The
+club data is live in BYU's own app. `calendar.byu.edu` additionally has a public **Submit an Event**
+form, and the API docs note that a department can publish through the BYU Calendar system while
+choosing not to display on `calendar.byu.edu` (the `IsPublishedNotMainCalendar` field exists for
+exactly this).
 
-The ask is therefore concrete and cheap: **get clubs and colleges publishing into the calendar
-system BYU already runs**, and this calendar fills in with no further engineering.
+The ask is therefore concrete and cheap: **read access to the same club-events feed the BYU app
+uses**. Everything else in this project already works, and the coverage gap closes with no new
+engineering on BYU's side.
 
 ## 5. One endpoint is broken from here
 

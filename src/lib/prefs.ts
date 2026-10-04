@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DesignId, Filters } from './types';
+import type { AppMode, Filters, ViewId } from './types';
 import { EMPTY_FILTERS } from './types';
+import { resolveView } from './views';
 
 /**
  * Preferences live in two places on purpose:
@@ -17,20 +18,22 @@ import { EMPTY_FILTERS } from './types';
 
 const STORAGE_KEY = 'byu-campus-calendar.v1';
 
-/** Single list so a new design cannot be accepted by the URL but rejected by storage. */
-const DESIGN_IDS: DesignId[] = ['campus', 'feed', 'discover', 'planner'];
+const APP_MODES: AppMode[] = ['day', 'feed', 'discover', 'month'];
 
 interface StoredPrefs {
   interests: string[];
   myFeedOnly: boolean;
-  design: DesignId;
+  view: ViewId;
+  /** Which layout was last open inside the BYU App surface. */
+  appMode: AppMode;
   saved: string[];
 }
 
 const DEFAULTS: StoredPrefs = {
   interests: [],
   myFeedOnly: true,
-  design: 'campus',
+  view: 'web',
+  appMode: 'day',
   saved: []
 };
 
@@ -42,7 +45,10 @@ function readStorage(): StoredPrefs {
     return {
       interests: Array.isArray(parsed.interests) ? parsed.interests.filter((x) => typeof x === 'string') : [],
       myFeedOnly: typeof parsed.myFeedOnly === 'boolean' ? parsed.myFeedOnly : true,
-      design: DESIGN_IDS.includes(parsed.design as DesignId) ? (parsed.design as DesignId) : 'campus',
+      // resolveView also maps the retired `campus` id onto `web`, so a preference saved before the
+      // rename still restores the right surface instead of silently resetting.
+      view: resolveView(parsed.view as string) ?? 'web',
+      appMode: APP_MODES.includes(parsed.appMode as AppMode) ? (parsed.appMode as AppMode) : 'day',
       saved: Array.isArray(parsed.saved) ? parsed.saved.filter((x) => typeof x === 'string') : []
     };
   } catch {
@@ -96,15 +102,23 @@ function filtersFromUrl(): Partial<Filters> | null {
   return found ? out : null;
 }
 
-export function designFromUrl(): DesignId | null {
-  const value = new URLSearchParams(window.location.search).get('design') as DesignId | null;
-  return value && DESIGN_IDS.includes(value) ? value : null;
+/** `?view=` is canonical; `?design=` is still read so links shared before the rename keep working. */
+export function viewFromUrl(): ViewId | null {
+  const params = new URLSearchParams(window.location.search);
+  return resolveView(params.get('view')) ?? resolveView(params.get('design'));
+}
+
+export function appModeFromUrl(): AppMode | null {
+  const value = new URLSearchParams(window.location.search).get('mode') as AppMode | null;
+  return value && APP_MODES.includes(value) ? value : null;
 }
 
 /** Serializes filters into a query string, omitting anything at its default. */
-export function filtersToQuery(filters: Filters, design?: DesignId): string {
+export function filtersToQuery(filters: Filters, view?: ViewId, appMode?: AppMode): string {
   const params = new URLSearchParams();
-  if (design) params.set('design', design);
+  if (view) params.set('view', view);
+  // Only meaningful on the App surface, and only worth serializing when it is not the default.
+  if (view === 'app' && appMode && appMode !== 'day') params.set('mode', appMode);
   if (filters.interests.length) params.set('interests', filters.interests.join(','));
   if (filters.orgs.length) params.set('orgs', filters.orgs.join(','));
   if (filters.query) params.set('q', filters.query);
@@ -118,7 +132,8 @@ export function usePreferences() {
   const initial = useRef<StoredPrefs>();
   if (!initial.current) initial.current = readStorage();
 
-  const [design, setDesign] = useState<DesignId>(() => designFromUrl() ?? initial.current!.design);
+  const [view, setView] = useState<ViewId>(() => viewFromUrl() ?? initial.current!.view);
+  const [appMode, setAppMode] = useState<AppMode>(() => appModeFromUrl() ?? initial.current!.appMode);
 
   const [filters, setFilters] = useState<Filters>(() => {
     const fromUrl = filtersFromUrl();
@@ -135,16 +150,16 @@ export function usePreferences() {
   // Persist the durable bits. `query` and `range` are deliberately not persisted: a search box that
   // still holds last week's query on a fresh visit feels broken.
   useEffect(() => {
-    writeStorage({ interests: filters.interests, myFeedOnly: filters.myFeedOnly, design, saved });
-  }, [filters.interests, filters.myFeedOnly, design, saved]);
+    writeStorage({ interests: filters.interests, myFeedOnly: filters.myFeedOnly, view, appMode, saved });
+  }, [filters.interests, filters.myFeedOnly, view, appMode, saved]);
 
   // Keep the address bar in sync so the current view is always copy-pasteable. replaceState rather
   // than pushState: filter tweaks should not fill up the back button.
   useEffect(() => {
-    const query = filtersToQuery(filters, design);
+    const query = filtersToQuery(filters, view, appMode);
     const next = `${window.location.pathname}${query ? `?${query}` : ''}`;
     window.history.replaceState(null, '', next);
-  }, [filters, design]);
+  }, [filters, view, appMode]);
 
   const toggleInterest = useCallback((id: string) => {
     setFilters((f) => ({
@@ -172,8 +187,10 @@ export function usePreferences() {
   );
 
   return {
-    design,
-    setDesign,
+    view,
+    setView,
+    appMode,
+    setAppMode,
     filters,
     patch,
     toggleInterest,

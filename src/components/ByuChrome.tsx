@@ -1,4 +1,6 @@
-import { Menu, Search, X } from 'lucide-react';
+import { Menu, Plus, Rss, Search, X } from 'lucide-react';
+import type { DateRangeId, Filters } from '../lib/types';
+import { INTEREST_COUNTS, INTEREST_LABELS } from '../lib/data';
 
 /**
  * A recreation of the calendar.byu.edu site chrome, for the Campus design.
@@ -136,6 +138,142 @@ export function ByuHeader({ activeCategory, onSelectCategory, query, onQueryChan
     </div>
   );
 }
+
+/**
+ * The feature bar that the real calendar.byu.edu does not have.
+ *
+ * This is the "keep BYU's styling but add our features" answer: everything here is drawn in BYU's
+ * own design language — square corners, navy and link-blue, uppercase lead-in labels, IBM Plex —
+ * so it looks like a section BYU built, not a widget bolted on.
+ *
+ * It surfaces the three things the real site makes impossible: filtering by what you actually care
+ * about, narrowing to a timeframe, and subscribing so the answer keeps arriving.
+ */
+export function ByuFeatureBar({
+  filters,
+  patch,
+  toggleInterest,
+  onOpenFilters,
+  onOpenSubscribe,
+  resultCount
+}: {
+  filters: Filters;
+  patch: (changes: Partial<Filters>) => void;
+  toggleInterest: (id: string) => void;
+  onOpenFilters: () => void;
+  onOpenSubscribe: () => void;
+  resultCount: number;
+}) {
+  // Followed interests first, then the biggest remaining ones, so the bar is immediately useful
+  // before a student has configured anything and personal once they have.
+  const followed = filters.myFeedOnly ? filters.interests : [];
+  const suggestions = Object.entries(INTEREST_COUNTS)
+    .filter(([id, count]) => count > 0 && !followed.includes(id))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([id]) => id);
+
+  return (
+    <section className="border-b border-byu-rule bg-byu-grey">
+      <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-byu-navy">
+            Show me
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {RANGE_OPTIONS.map((range) => (
+              <button
+                key={range.id}
+                type="button"
+                onClick={() => patch({ range: range.id })}
+                aria-pressed={filters.range === range.id}
+                className={`border px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                  filters.range === range.id
+                    ? 'border-byu-navy bg-byu-navy text-white'
+                    : 'border-byu-ruleDark bg-white text-byu-charcoal hover:border-byu-navy'
+                }`}
+              >
+                {range.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => patch({ freeOnly: !filters.freeOnly })}
+              aria-pressed={filters.freeOnly}
+              className={`border px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                filters.freeOnly
+                  ? 'border-byu-navy bg-byu-navy text-white'
+                  : 'border-byu-ruleDark bg-white text-byu-charcoal hover:border-byu-navy'
+              }`}
+            >
+              Free only
+            </button>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden text-[12px] text-byu-slate sm:inline">
+              {resultCount} {resultCount === 1 ? 'event' : 'events'}
+            </span>
+            <button
+              type="button"
+              onClick={onOpenSubscribe}
+              className="inline-flex items-center gap-1.5 border border-byu-link bg-byu-link px-3 py-1.5 text-[12px] font-bold uppercase tracking-[0.05em] text-white transition-colors hover:bg-white hover:text-byu-link"
+            >
+              <Rss className="h-3.5 w-3.5" aria-hidden />
+              Subscribe
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-byu-navy">
+            My interests
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {followed.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggleInterest(id)}
+                className="inline-flex items-center gap-1 border border-byu-navy bg-byu-navy px-2.5 py-1 text-[12px] font-semibold text-white"
+              >
+                {INTEREST_LABELS[id] ?? id}
+                <X className="h-3 w-3" aria-hidden />
+              </button>
+            ))}
+            {suggestions.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggleInterest(id)}
+                className="inline-flex items-center gap-1 border border-byu-ruleDark bg-white px-2.5 py-1 text-[12px] text-byu-charcoal transition-colors hover:border-byu-link hover:text-byu-link"
+              >
+                <Plus className="h-3 w-3" aria-hidden />
+                {INTEREST_LABELS[id] ?? id}
+                <span className="text-byu-slate">{INTEREST_COUNTS[id]}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={onOpenFilters}
+              className="px-2 py-1 text-[12px] font-semibold text-byu-link underline-offset-2 hover:underline"
+            >
+              All interests &amp; organizations →
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const RANGE_OPTIONS: { id: DateRangeId; label: string }[] = [
+  { id: 'all', label: 'Anytime' },
+  { id: 'today', label: 'Today' },
+  { id: 'weekend', label: 'This weekend' },
+  { id: 'week', label: 'Next 7 days' },
+  { id: 'month', label: 'Next 30 days' }
+];
 
 const FOOTER_COLUMNS: { heading: string; links: { label: string; href: string }[] }[] = [
   {

@@ -45,7 +45,24 @@ export interface EventSnapshot {
   events: CampusEvent[];
 }
 
-export type DesignId = 'campus' | 'feed' | 'discover' | 'planner';
+/**
+ * The five surfaces, in two families.
+ *
+ *   BYU surfaces  — what this proposal looks like inside BYU's *existing* products, so the pitch
+ *                   conversation can be about the idea rather than about whether it would fit.
+ *       web       recreation of calendar.byu.edu
+ *       app       recreation of the BYU mobile app's Calendar tab
+ *
+ *   Concepts      — what we would build given a free hand.
+ *       feed · discover · planner
+ *
+ * `campus` was the original id for `web` and is still accepted from URLs so older links keep
+ * working. See VIEW_ALIASES in lib/views.ts.
+ */
+export type ViewId = 'web' | 'app' | 'feed' | 'discover' | 'planner';
+
+/** Layouts available *inside* the BYU App surface. Deliberately excludes the website recreation. */
+export type AppMode = 'day' | 'feed' | 'discover' | 'month';
 
 export type DateRangeId = 'today' | 'weekend' | 'week' | 'month' | 'all';
 

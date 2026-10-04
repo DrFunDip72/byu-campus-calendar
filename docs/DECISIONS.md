@@ -58,13 +58,14 @@ This is the honest part, and it is surfaced in the product itself under the info
 
 | Gap | Why | Impact |
 | --- | --- | --- |
-| **Club and association events** | Not published to the BYU calendar system at all. `clubs.byu.edu` is a Mendix SPA with no public API; Marriott's club events are per-event HTML with no feed. **Verified: 0 matches for hackathon or PMA across 626 records / 365 days.** | **The biggest gap.** It is why "Hackathons" and "Study Abroad" show zero. See [`DATA-INVESTIGATION.md`](DATA-INVESTIGATION.md) for every source probed. BYU already runs a public "Submit an Event" form, so the pipe exists — the gap is adoption, not technology. |
+| **Club and association events** | Not on the *public* calendar API: 0 matches for hackathon or PMA across 626 records / 365 days. **But BYU's own mobile app shows them** — Marketing Association, Pre-Nursing, Investment Banking Association — with a dedicated "Club" field. The endpoint behind it is undocumented and authenticated. | **The biggest gap, and the cheapest to close.** It is why "Hackathons" and "Study Abroad" show zero. The data already exists inside BYU; the ask is read access to the same feed their app uses, not a new publishing programme. See [`DATA-INVESTIGATION.md`](DATA-INVESTIGATION.md). |
 | **Most college/department calendars** | Only 11 organizations publish a usable host name to the API. | CS is wired up to prove per-department sources merge cleanly. Each other college needs the same ~40 lines. |
 | **Intramurals, Y-Serve** | Separate systems. | Significant student-life volume missing. |
 | **A student's class schedule** | Needs BYU sign-in. | Highest-value *addition*: it would let the calendar hide events that collide with classes. |
 
-**The ask this implies:** the pipeline is built and working. What it needs from BYU is source
-access — chiefly a club-events feed — not more engineering.
+**The ask this implies:** the pipeline is built and working. What it needs from BYU is read access
+to one feed it already operates — the club-events source behind the BYU app's Calendar tab — not
+more engineering and not a new content programme.
 
 ---
 
@@ -156,28 +157,27 @@ in the UI turns a weakness into the specific, actionable ask in §2.
 
 ---
 
-## 6. Four designs, one engine
+## 6. Five surfaces, one engine
 
 The four layouts are **presentation only**. Data, search, filtering, preferences, and calendar
 export are identical and shared. A decision between them is a decision about students, not features.
 
-| | **BYU.edu** (default) | **Feed** | **Discover** | **Planner** |
-| --- | --- | --- | --- | --- |
-| **Thesis** | "What would this look like on our site?" | "What's on today?" | "Show me something good" | "What does my month look like?" |
-| **Form** | Recreation of calendar.byu.edu: navy section bars, carousel rows of promo cards | Dense day-grouped list, fixed time gutter, 56px thumbnails | Image-led cards, featured lead, horizontal rails | Month grid + sticky day panel |
-| **Events per screen** | ~3 per row, rows stacked | ~12 | ~4 | ~30 (titles only) |
-| **Best at** | Showing leadership the idea inside their own design system | Answering a specific question fast | Discovery; serendipity | Density, conflicts, planning |
-| **Worst at** | Density — a carousel hides most of the row behind a click | Making an unknown event look appealing | Information density; favours events with good artwork | Discovery; needs real screen width |
-| **Would suit** | The actual calendar.byu.edu home page | The default for a logged-in student | A homepage, or digital signage | A planning tool, or an advisor's view |
+| | **BYU Website** (default) | **BYU App** | **Feed** | **Discover** | **Planner** |
+| --- | --- | --- | --- | --- | --- |
+| **Thesis** | "What would this look like on our site?" | "...and on our app?" | "What's on today?" | "Show me something good" | "What does my month look like?" |
+| **Form** | Recreation of calendar.byu.edu: navy section bars, carousel rows | Recreation of the app's Calendar tab, dark, with four layouts inside | Dense day-grouped list | Image-led cards and rails | Month grid + day panel |
+| **Events per screen** | ~3 per row | ~5 | ~12 | ~4 | ~30 (titles only) |
+| **Best at** | Showing leadership it fits the site they run | Showing it where students actually are | Answering a specific question fast | Discovery; serendipity | Density, conflicts, planning |
+| **Worst at** | Density — a carousel hides most of the row | Small screen means less context per event | Making an unknown event look appealing | Density; favours good artwork | Discovery; needs screen width |
 
-**Why BYU.edu is the default:** this build's first job is a pitch. Opening on BYU's own layout makes
-the first question "should we do this" rather than "would this fit our site". The other three then
+**Why BYU Website is the default:** this build's first job is a pitch. Opening on BYU's own layout
+makes the first question "should we do this" rather than "would this fit our site". The others then
 show what becomes possible once the data is unified.
 
 **Why Feed is the best default for students:** most real visits are a specific question with time
 pressure behind it. Discovery is the second visit, not the first.
 
-### The BYU.edu design is matched, not approximated
+### The BYU Website surface is matched, not approximated
 
 Every value came from the live site, not from a screenshot:
 
@@ -206,12 +206,108 @@ Two deliberate departures, both flagged in the UI:
 **Why Discover is viable at all:** 349 of 385 events carry an `ImgUrl`. BYU already publishes event
 artwork, and an image-led design built on a dataset without images would be a mock, not a prototype.
 
-**Why all four are always visible in the header**, rather than one shipping and three in a deck:
-the point of this build is to let people compare them against real data in one sitting.
+**Why all five are always visible**, rather than one shipping and four in a deck: the point of this
+build is to let people compare them against real data in one sitting. See §7 for how.
 
 ---
 
-## 7. Preferences: no login
+## 7. One app, five surfaces — not three apps
+
+**The question:** the BYU Website recreation and the BYU App recreation are different products for
+different audiences. Should they be separate deployments?
+
+**Decision: one app, one URL, five named surfaces.**
+
+Three deployments would have meant three copies of the ingest, the taxonomy, the filter engine and
+the calendar export — and three URLs for whoever is being pitched to keep straight. The entire point
+of this project is that one dataset can wear any skin; shipping it as separate apps would argue the
+opposite. A student's interests, saved events and subscription also follow them between surfaces,
+which is only possible in one app.
+
+**Naming is the navigation.** The surfaces are grouped into two families whose names say *why* each
+one exists:
+
+| Group | Surface | What it is |
+| --- | --- | --- |
+| **Inside BYU's products** | **BYU Website** | `calendar.byu.edu`'s layout, plus our search, filters and sync |
+| | **BYU App** | The BYU app's Calendar tab, rebuilt around interests |
+| **Our concepts** | **Feed** | Dense, scannable, grouped by day |
+| | **Discover** | Image-led browsing |
+| | **Planner** | Month grid with a day panel |
+
+"BYU.edu / Feed / Discover / Planner" was the previous naming and it was worse: it put a recreation
+and three originals on the same footing, so a reviewer could not tell which were proposals and which
+were mirrors of what BYU already has.
+
+**How you move between them:**
+
+- **Desktop** — all five in the top bar, grouped, with a divider between the families.
+- **Mobile** — the bar collapses to the current surface's name, which opens the **Views sheet**: the
+  "links page", listing every surface with a sentence on what it is and what it is best for. It
+  doubles as the explainer a first-time visitor needs.
+- Rejected: a hamburger (hides the single most important control behind a tap and a guess) and a
+  footer nav (invisible until you scroll past everything).
+
+The switcher bar is deliberately styled *unlike* BYU — near-black, small, dense — so it never reads
+as part of the BYU surfaces beneath it. It is scaffolding around the prototype, not the product.
+
+**URL compatibility:** `?view=` is canonical, `?design=` is still read, and the retired `campus` id
+maps onto `web`, so links shared before the rename keep working. Asserted in the smoke test.
+
+---
+
+## 8. The BYU App surface, and what we changed about it
+
+Recreated from a screen recording of the real app. The colours are sampled rather than guessed —
+frames extracted with ffmpeg, pixels read out of the raw RGB buffer:
+
+```
+page #041730   card #0A2D57   bar/tab #01192C   month header #076940
+```
+
+Kept from the real app: the hamburger / BYU / funnel header, the green month bar, the seven-day
+strip with dots, day-grouped cards with a coloured category stripe and a square thumbnail, and the
+three-tab bottom bar with Calendar active.
+
+Changed, and these are the proposal:
+
+1. **Four layouts inside the Calendar tab** — Day (theirs), Feed, Discover, Month. The real app has
+   only the day list, which answers "what is on this exact date" and nothing else; "what's on this
+   week" currently takes seven taps.
+2. **The funnel filters by interest**, not just category — the same engine as every other surface.
+3. **Add-to-calendar on the card.** In the real app that is three taps deep: open event → calendar
+   icon → choose app.
+4. **Event dots are coloured by category**, so the week strip previews what *kind* of day it is
+   rather than only that something exists.
+
+On a desktop screen it renders inside a phone frame, because a full-bleed "mobile app" on a
+projector reads as a website and undersells the point.
+
+---
+
+## 9. Progressive web app
+
+**Decision:** installable PWA with an offline shell, rather than a native app.
+
+A native app would need store review, two codebases, and — most importantly — BYU already *has* a
+native app. The proposal is a change to theirs, not a competitor to it. A PWA installs to the home
+screen, opens full screen, and works on the shuttle with no signal, at zero distribution cost.
+
+- **Install prompt** — `beforeinstallprompt` is captured and replayed from our own BYU-styled
+  banner. iOS Safari has no such event, so it gets the literal two-tap instruction (Share → Add to
+  Home Screen) and nothing is promised that cannot be delivered. Dismissal sticks for 30 days.
+- **Service worker** — network-first for navigations (fresh when online, shell when not),
+  cache-first for Vite's fingerprinted assets (a new build is a new URL, so a cached one can never
+  be stale), and a capped image cache for BYU's CDN artwork.
+- **`/feed.ics` is never cached.** A stale calendar subscription silently stops updating, which is
+  worse than no offline support at all.
+- **Icons are generated by a script**, not committed as unexplained binaries, and ship in both
+  `any` and `maskable` variants — using the full-bleed icon as maskable is the classic PWA bug where
+  Android's circular crop shaves the wordmark.
+
+---
+
+## 10. Preferences: no login
 
 Interests persist in `localStorage` **and** in the URL.
 
@@ -229,7 +325,7 @@ version reads interests from a BYU sign-in, which also unlocks class-schedule co
 
 ---
 
-## 8. Calendar export: the feature that makes it stick
+## 11. Calendar export: the feature that makes it stick
 
 Four paths out, in deliberate priority order:
 
@@ -255,7 +351,7 @@ Implementation notes that are easy to get wrong and were got right:
 
 ---
 
-## 9. Time zones
+## 12. Time zones
 
 Every timestamp from the API arrives as Denver wall time with **no offset** (`"2026-10-09 20:15:00"`
 plus a separate `Timezone` field). Passing that to `new Date()` interprets it in the *viewer's* zone,
@@ -275,7 +371,7 @@ the Provo clock time is the time printed on the ticket.
 
 ---
 
-## 10. De-duplication across sources
+## 13. De-duplication across sources
 
 Two sources describing one campus double-report events, and **they do not agree on the title**: the
 CS department calls it "Grad School Fair" and the main calendar calls it "Graduate School Fair" —
@@ -299,7 +395,7 @@ event detail.
 
 ---
 
-## 11. Visual design
+## 14. Visual design
 
 Not a guess from a screenshot — the values are taken from BYU's own systems:
 
@@ -314,13 +410,17 @@ eight visually separable chips and navy-on-navy is unreadable. Each is darkened 
 
 ---
 
-## 12. Testing
+## 15. Testing
 
 No browser automation was available, so `scripts/smoke.mjs` server-renders the real `App` against
 the real snapshot through `react-dom/server` and asserts behaviour, not just absence of crashes
-(29 checks):
+(42 checks):
 
-- all four designs render, each with its own chrome, and each still offers the layout switcher
+- all five surfaces render, each with its own chrome, and each still offers the view switcher
+- the retired `?design=campus` id still resolves, so links shared before the rename keep working
+- the BYU App surface offers all four of its internal layouts and honours `?mode=`
+- the PWA manifest is standalone, ships `any` **and** `maskable` icons, every icon file it names
+  actually exists, and the service worker never caches `/feed.ics`
 - a `football` filter shows football and **excludes basketball**
 - search for "notre dame" finds the game
 - a hopeless search shows the empty state
@@ -348,7 +448,7 @@ returns nothing looks exactly like a campus with nothing scheduled.
 
 ---
 
-## 13. What we would do next, in order
+## 16. What we would do next, in order
 
 1. **Get a club-events source.** Largest coverage gap by far; everything else is polish.
 2. **BYU sign-in** → class-schedule conflict detection ("you have class then"), cross-device sync.

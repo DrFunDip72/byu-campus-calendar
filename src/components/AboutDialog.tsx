@@ -1,6 +1,6 @@
 import { CheckCircle2, CircleDashed, ExternalLink, X } from 'lucide-react';
 import { DATA } from '../lib/data';
-import { DESIGNS } from './AppHeader';
+import { VIEWS, VIEW_GROUPS, viewsInGroup } from '../lib/views';
 
 /**
  * The honesty panel.
@@ -43,29 +43,36 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
 
         <section className="mb-6">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-            Four layouts, one dataset
+            {VIEWS.length} views, one dataset
           </h3>
           <p className="mb-3 max-w-prose text-sm text-muted">
-            Switch between them in the header. The data, search, filters and calendar export are
-            identical in all four — only the presentation changes, so a decision between them is a
-            decision about students, not about features. <strong className="text-ink">BYU.edu</strong>{' '}
-            is a recreation of calendar.byu.edu&apos;s own layout, matched to that site&apos;s
-            stylesheet, so you can see this proposal inside the existing design system.
+            Switch between them in the bar at the top. The data, search, filters and calendar export
+            are identical in every one — only the presentation changes, so a decision between them is
+            a decision about students, not about features.
           </p>
-          <ul className="flex flex-col gap-2">
-            {DESIGNS.map((design) => {
-              const Icon = design.icon;
-              return (
-                <li key={design.id} className="flex items-start gap-2.5 text-sm">
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-navy-400" aria-hidden />
-                  <span>
-                    <span className="font-semibold text-ink">{design.label}</span>
-                    <span className="text-muted"> — {design.blurb}.</span>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="flex flex-col gap-4">
+            {VIEW_GROUPS.map((group) => (
+              <div key={group.id}>
+                <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-navy-400">
+                  {group.label}
+                </h4>
+                <ul className="flex flex-col gap-2">
+                  {viewsInGroup(group.id).map((definition) => {
+                    const Icon = definition.icon;
+                    return (
+                      <li key={definition.id} className="flex items-start gap-2.5 text-sm">
+                        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-navy-400" aria-hidden />
+                        <span>
+                          <span className="font-semibold text-ink">{definition.title}</span>
+                          <span className="text-muted"> — {definition.blurb}.</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="mb-6">
@@ -110,7 +117,7 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
             {[
               [
                 'Club and association events',
-                'We searched all 626 records across 365 days: zero matches for hackathons or the Product Management Association. Clubs do not publish to the BYU calendar system at all — clubs.byu.edu has no public API, and Marriott’s club events have no feed. This is the biggest gap, and the reason those filters read zero.'
+                'The public calendar API does not carry them: zero matches for hackathons or the Product Management Association across all 626 records in 365 days. But BYU’s own mobile app does show them — Marketing Association, Pre-Nursing Association, Investment Banking Association — so the data exists inside BYU, just not on the public endpoint this reads. Connecting that one feed closes the single biggest gap here.'
               ],
               [
                 'Most college and department calendars',

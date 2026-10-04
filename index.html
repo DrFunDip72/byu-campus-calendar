@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>BYU Campus Calendar — every event on campus, in one place</title>
     <meta
       name="description"
@@ -10,6 +10,15 @@
     />
     <meta name="theme-color" content="#002E5D" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <!-- PWA. The manifest drives Android/desktop install; iOS Safari ignores it and reads the
+         apple-* tags below, which is why both sets are present. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BYU Events" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta property="og:title" content="BYU Campus Calendar" />
     <meta property="og:description" content="Every event on campus, in one place. Filtered to you." />
     <meta property="og:type" content="website" />

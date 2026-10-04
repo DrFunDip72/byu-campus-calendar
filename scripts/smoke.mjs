@@ -9,7 +9,7 @@
 
 import { JSDOM } from 'jsdom';
 import { build } from 'esbuild';
-import { readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
@@ -60,34 +60,73 @@ function renderWith(search) {
   return render();
 }
 
-console.log('\nDesigns render:');
-// The Campus design recreates calendar.byu.edu, so it carries BYU's own wording ("Events
-// Calendar") rather than ours. Each design asserts against the chrome it is supposed to render.
-const DESIGN_MARKERS = {
-  campus: 'Events Calendar',
+console.log('\nViews render:');
+// Each surface asserts against the chrome it is supposed to render. The two BYU recreations carry
+// BYU's own wording; the three concepts carry ours.
+const VIEW_MARKERS = {
+  web: 'Events Calendar',
+  app: 'Calendar',
   feed: 'Campus Calendar',
   discover: 'Campus Calendar',
   planner: 'Campus Calendar'
 };
-for (const [design, marker] of Object.entries(DESIGN_MARKERS)) {
+for (const [view, marker] of Object.entries(VIEW_MARKERS)) {
   let html = '';
   let error = null;
   try {
-    html = renderWith(`?design=${design}`);
+    html = renderWith(`?view=${view}`);
   } catch (err) {
     error = err;
   }
-  check(`${design} renders`, !error && html.length > 5000, error?.message ?? `${html.length} bytes`);
-  check(`${design} shows its own chrome`, html.includes(marker));
-  // Every design must offer the layout switcher, or there is no way back out of it.
-  check(`${design} offers the layout switcher`, html.includes('BYU.edu') && html.includes('Planner'));
+  check(`${view} renders`, !error && html.length > 5000, error?.message ?? `${html.length} bytes`);
+  check(`${view} shows its own chrome`, html.includes(marker));
+  // Every surface must offer the view switcher, or there is no way back out of it.
+  check(`${view} offers the view switcher`, html.includes('BYU Website') && html.includes('Planner'));
 }
+
+console.log('\nNavigation:');
+// The retired `campus` id must still resolve, or links shared before the rename break.
+check(
+  'legacy ?design=campus still resolves to BYU Website',
+  renderWith('?design=campus').includes('Events Calendar')
+);
+check('legacy ?design=feed still resolves', renderWith('?design=feed').includes('Campus Calendar'));
+const appHtml = renderWith('?view=app');
+check(
+  'app surface offers all four layouts',
+  ['Day', 'Feed', 'Discover', 'Month'].every((m) => appHtml.includes(m))
+);
+check('app surface renders its bottom tab bar', appHtml.includes('Home') && appHtml.includes('Search'));
+check('app surface honours ?mode=month', renderWith('?view=app&mode=month').includes('Tap a day to open it'));
+
+console.log('\nPWA:');
+const manifest = JSON.parse(readFileSync('public/manifest.webmanifest', 'utf8'));
+check('manifest has a name and start_url', Boolean(manifest.name && manifest.start_url));
+check('manifest is standalone', manifest.display === 'standalone');
+check(
+  'manifest ships both any and maskable icons',
+  manifest.icons.some((i) => i.purpose === 'any') && manifest.icons.some((i) => i.purpose === 'maskable')
+);
+check(
+  'every manifest icon file exists',
+  manifest.icons.every((i) => existsSync(`public${i.src}`)),
+  manifest.icons
+    .filter((i) => !existsSync(`public${i.src}`))
+    .map((i) => i.src)
+    .join(', ')
+);
+check('apple-touch-icon exists', existsSync('public/icons/apple-touch-icon.png'));
+const indexHtml = readFileSync('index.html', 'utf8');
+check('index.html links the manifest', indexHtml.includes('rel="manifest"'));
+check('index.html links an apple-touch-icon', indexHtml.includes('apple-touch-icon'));
+// A cached .ics would silently stop updating a subscriber's calendar, so the worker must skip it.
+check('service worker never caches the calendar feed', readFileSync('public/sw.js', 'utf8').includes("'/feed.ics'"));
 
 console.log('\nFilters narrow results:');
 const snapshot = JSON.parse(readFileSync('src/data/events.json', 'utf8'));
 const football = snapshot.events.filter((e) => e.interests.includes('football'));
 
-const footballHtml = renderWith('?design=feed&interests=football');
+const footballHtml = renderWith('?view=feed&interests=football');
 check('football filter shows a football game', footballHtml.includes('Football vs.'));
 check(
   'football filter excludes basketball',
@@ -96,32 +135,34 @@ check(
 );
 check(`snapshot actually has football games`, football.length > 0, `${football.length} found`);
 
-const searchHtml = renderWith('?design=feed&q=notre%20dame');
+const searchHtml = renderWith('?view=feed&q=notre%20dame');
 check('search finds "notre dame"', searchHtml.includes('Notre Dame'));
 
-const emptyHtml = renderWith('?design=feed&q=zzzzznotathing');
+const emptyHtml = renderWith('?view=feed&q=zzzzznotathing');
 check('a hopeless search shows the empty state', emptyHtml.includes('No events match'));
 
-const zeroCoverage = renderWith('?design=feed&interests=hackathon');
+const zeroCoverage = renderWith('?view=feed&interests=hackathon');
 check(
   'a zero-coverage interest explains itself',
   zeroCoverage.includes('Nothing scheduled for'),
   'the empty-interest notice did not render'
 );
 
-const multi = renderWith('?design=planner&interests=football,dance');
+const multi = renderWith('?view=planner&interests=football,dance');
 check('planner renders a multi-interest selection', multi.includes('Planner') || multi.length > 5000);
 
-// The Campus design recreates calendar.byu.edu, so its markers are BYU's, not ours.
-const campus = renderWith('?design=campus');
-check('campus renders the BYU chrome', campus.includes('Events Calendar') && campus.includes('Submit an Event'));
-check('campus renders the BYU footer', campus.includes('All Rights Reserved'));
-check('campus labels itself a prototype', campus.includes('Prototype'));
-check('campus groups into category rows', campus.includes('Full Schedule'));
-const campusFiltered = renderWith('?design=campus&interests=football');
-check('campus respects interest filters', campusFiltered.includes('Football vs.') && !campusFiltered.includes('Basketball vs.'));
+// The BYU Website surface recreates calendar.byu.edu, so its markers are BYU's, not ours.
+const web = renderWith('?view=web');
+check('web renders the BYU chrome', web.includes('Events Calendar') && web.includes('Submit an Event'));
+check('web renders the BYU footer', web.includes('All Rights Reserved'));
+check('web groups into category rows', web.includes('Full Schedule'));
+check('web exposes the added feature bar', web.includes('My interests') && web.includes('This weekend'));
+const webFiltered = renderWith('?view=web&interests=football');
+check('web respects interest filters', webFiltered.includes('Football vs.') && !webFiltered.includes('Basketball vs.'));
+const appFiltered = renderWith('?view=app&interests=football');
+check('app respects interest filters', appFiltered.includes('Football vs.') && !appFiltered.includes('Basketball vs.'));
 
-const freeHtml = renderWith('?design=discover&free=1');
+const freeHtml = renderWith('?view=discover&free=1');
 check('discover renders with freeOnly', freeHtml.length > 5000);
 
 console.log('\nSnapshot integrity:');
