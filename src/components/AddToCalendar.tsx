@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CalendarPlus, Check, ChevronDown, Download } from 'lucide-react';
 import type { CampusEvent } from '../lib/types';
 import { downloadIcs, googleCalendarUrl, outlookCalendarUrl } from '../lib/calendar';
+import { trackAddToCalendar } from '../lib/analytics';
 
 interface Props {
   event: CampusEvent;
@@ -36,8 +37,9 @@ export function AddToCalendar({ event, saved, onSave, size = 'md', fullWidth }: 
     };
   }, [open]);
 
-  const openTarget = (url: string) => {
+  const openTarget = (url: string, target: string) => {
     window.open(url, '_blank', 'noopener,noreferrer');
+    trackAddToCalendar(target, currentViewId());
     if (!saved) onSave();
     setOpen(false);
   };
@@ -60,7 +62,7 @@ export function AddToCalendar({ event, saved, onSave, size = 'md', fullWidth }: 
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            openTarget(googleCalendarUrl(event));
+            openTarget(googleCalendarUrl(event), 'google');
           }}
           aria-label={`Add ${event.title} to Google Calendar`}
           className={`inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap ${pad}`}
@@ -89,11 +91,12 @@ export function AddToCalendar({ event, saved, onSave, size = 'md', fullWidth }: 
           role="menu"
           className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-lg border border-line bg-white py-1 shadow-lift"
         >
-          <MenuItem onClick={() => openTarget(googleCalendarUrl(event))}>Google Calendar</MenuItem>
-          <MenuItem onClick={() => openTarget(outlookCalendarUrl(event))}>Outlook / Office 365</MenuItem>
+          <MenuItem onClick={() => openTarget(googleCalendarUrl(event), 'google')}>Google Calendar</MenuItem>
+          <MenuItem onClick={() => openTarget(outlookCalendarUrl(event), 'outlook')}>Outlook / Office 365</MenuItem>
           <MenuItem
             onClick={() => {
               downloadIcs([event], `${event.id.replace(/[^\w-]/g, '-')}.ics`, event.title);
+              trackAddToCalendar('ics', currentViewId());
               if (!saved) onSave();
               setOpen(false);
             }}
@@ -105,6 +108,11 @@ export function AddToCalendar({ event, saved, onSave, size = 'md', fullWidth }: 
       )}
     </div>
   );
+}
+
+/** The surface an add happened on, read from the URL rather than threaded through every caller. */
+function currentViewId(): string {
+  return new URLSearchParams(window.location.search).get('view') ?? 'web';
 }
 
 function MenuItem({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {

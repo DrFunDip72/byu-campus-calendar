@@ -456,3 +456,36 @@ returns nothing looks exactly like a campus with nothing scheduled.
 4. **Submit-an-event** form for clubs with no feed at all, with light moderation.
 5. **Analytics on follows** — which interests students actually pick is a dataset BYU does not
    currently have, and it would inform programming decisions, not just this product.
+
+---
+
+## 17. Usage tracking
+
+**Decision:** Vercel Web Analytics, plus five custom events.
+
+**Why this and not the alternatives:**
+
+| Option | Verdict |
+| --- | --- |
+| **Vercel Web Analytics** | **Chosen.** Already part of the hosting — one package, one component, one dashboard toggle. Sets no cookies and stores no personal data, so there is no consent banner to build. Free on the current plan. |
+| Google Analytics 4 | Free, but heavier, and it sets cookies — which means a consent banner on something being pitched to a university. More setup for data we do not need. |
+| Plausible / Fathom | Good, privacy-first, and paid. No advantage here over what the host already provides. |
+| Server logs | Free but useless: no notion of unique visitors, and the static assets are served from a CDN. |
+
+**Why custom events at all.** The app is a single page whose surfaces are query parameters, so raw
+page views would report one number and tell us nothing about *which* surface anyone used — the one
+question this whole project exists to answer. Five events cover it:
+
+| Event | Question it answers |
+| --- | --- |
+| `view_change` | Which of the five surfaces do people actually use? |
+| `add_to_calendar` | Did anyone act on an event? (The core conversion.) |
+| `subscribe` | Did anyone want the feed permanently? (The stickiness signal.) |
+| `follow_interest` | Is the interest model right, and which interests win? |
+| `install_pwa` | How many people put it on a home screen? |
+
+**Deliberately small.** The free tier caps events per month, and a dashboard with forty event types
+answers no question at all. Follows are tracked but not unfollows; search text is never sent.
+
+**Nothing identifying is collected.** No user id, no search strings, no event titles. The only
+values sent are fixed vocabulary from our own code — view ids, interest ids, and a calendar target.

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { CalendarX2, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { AppHeader } from './components/AppHeader';
 import { AboutDialog } from './components/AboutDialog';
@@ -17,7 +18,8 @@ import { applyFilters } from './lib/filters';
 import { DATA, EVENTS, INTEREST_LABELS } from './lib/data';
 import { usePreferences } from './lib/prefs';
 import { viewById } from './lib/views';
-import type { CampusEvent } from './lib/types';
+import { trackViewChange } from './lib/analytics';
+import type { CampusEvent, ViewId } from './lib/types';
 
 export default function App() {
   const {
@@ -33,6 +35,16 @@ export default function App() {
     saved,
     toggleSaved
   } = usePreferences();
+
+  // Wrapped so every surface switch is recorded once, wherever it was triggered from. Which of
+  // the five surfaces people actually use is the single most useful number this project can report.
+  const changeView = useCallback(
+    (next: ViewId, via: 'switcher' | 'sheet' = 'switcher') => {
+      setView(next);
+      trackViewChange(next, via);
+    },
+    [setView]
+  );
 
   const [detail, setDetail] = useState<CampusEvent | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -97,7 +109,7 @@ export default function App() {
     <>
       <ViewSwitcher
         view={view}
-        onViewChange={setView}
+        onViewChange={changeView}
         onOpenFilters={() => setFiltersOpen(true)}
         onOpenSubscribe={() => setSubscribeOpen(true)}
         onOpenAbout={() => setAboutOpen(true)}
@@ -126,7 +138,7 @@ export default function App() {
       <ViewsSheet
         open={viewsOpen}
         current={view}
-        onSelect={setView}
+        onSelect={(next) => changeView(next, 'sheet')}
         onClose={() => setViewsOpen(false)}
       />
       {filtersOpen && (
@@ -135,6 +147,8 @@ export default function App() {
         </FilterSheet>
       )}
       <InstallPrompt />
+      {/* Vercel Web Analytics: page views, visitors, referrers. Cookie-free, so no consent banner. */}
+      <Analytics />
     </>
   );
 

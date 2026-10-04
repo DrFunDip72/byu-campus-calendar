@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppMode, Filters, ViewId } from './types';
 import { EMPTY_FILTERS } from './types';
 import { resolveView } from './views';
+import { trackFollowInterest } from './analytics';
 
 /**
  * Preferences live in two places on purpose:
@@ -162,10 +163,16 @@ export function usePreferences() {
   }, [filters, view, appMode]);
 
   const toggleInterest = useCallback((id: string) => {
-    setFilters((f) => ({
-      ...f,
-      interests: f.interests.includes(id) ? f.interests.filter((x) => x !== id) : [...f.interests, id]
-    }));
+    setFilters((f) => {
+      const following = f.interests.includes(id);
+      // Only follows are reported, not unfollows: the question worth answering is which interests
+      // students want, and counting both halves of a toggle would just add noise.
+      if (!following) trackFollowInterest(id);
+      return {
+        ...f,
+        interests: following ? f.interests.filter((x) => x !== id) : [...f.interests, id]
+      };
+    });
   }, []);
 
   const toggleOrg = useCallback((name: string) => {

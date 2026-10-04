@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { trackInstall } from './analytics';
 
 /**
  * PWA install support.
@@ -76,7 +77,11 @@ export function useInstallPrompt() {
     // meaningless advice on a desktop browser.
     if (isIosSafari() && window.matchMedia('(max-width: 820px)').matches) {
       // Delayed so it does not cover the first thing a student sees.
-      const timer = setTimeout(() => setMode('ios'), 2500);
+      const timer = setTimeout(() => {
+        setMode('ios');
+        // iOS cannot report an install, so the best available signal is that we showed the how-to.
+        trackInstall('ios_shown');
+      }, 2500);
       return () => {
         clearTimeout(timer);
         window.removeEventListener('beforeinstallprompt', onBeforeInstall);
@@ -94,6 +99,7 @@ export function useInstallPrompt() {
     if (!deferred) return;
     await deferred.prompt();
     const { outcome } = await deferred.userChoice;
+    if (outcome === 'accepted') trackInstall('accepted');
     // The event can only be used once; Chrome re-fires it later if the student declines.
     setDeferred(null);
     setMode('none');

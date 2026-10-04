@@ -143,6 +143,23 @@ worked example — it exists mainly to prove the multi-source path, and it corre
 Returns `text/calendar`. An unknown interest id returns **400 rather than an empty calendar**,
 because "nothing is scheduled" is a more confusing failure than an error.
 
+## Usage tracking
+
+[Vercel Web Analytics](https://vercel.com/docs/analytics) — no cookies, no consent banner, free on
+the current plan. Page views and visitors are automatic; five custom events answer the questions
+raw page views cannot, since every surface lives at the same URL:
+
+| Event | Question |
+| --- | --- |
+| `view_change` | Which of the five surfaces do people use? |
+| `add_to_calendar` | Did anyone act on an event? |
+| `subscribe` | Did anyone want the feed permanently? |
+| `follow_interest` | Which interests do students actually want? |
+| `install_pwa` | How many installed it to a home screen? |
+
+**One-time setup:** Vercel dashboard → the project → **Analytics** → **Enable**. Nothing is
+collected until that toggle is on. See `docs/DECISIONS.md` §17 for why this over GA4/Plausible.
+
 ## What it does not cover yet
 
 Stated in the app under the info icon, and in detail in `docs/DECISIONS.md`:

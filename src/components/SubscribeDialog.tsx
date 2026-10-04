@@ -4,6 +4,7 @@ import type { CampusEvent, Filters, ViewId } from '../lib/types';
 import { INTEREST_LABELS } from '../lib/data';
 import { downloadIcs, subscribeUrl } from '../lib/calendar';
 import { filtersToQuery } from '../lib/prefs';
+import { trackSubscribe } from '../lib/analytics';
 
 interface Props {
   open: boolean;
@@ -43,6 +44,7 @@ export function SubscribeDialog({ open, onClose, filters, view, events }: Props)
   const copy = async (value: string, which: 'webcal' | 'https') => {
     try {
       await navigator.clipboard.writeText(value);
+      trackSubscribe('copy', filters.interests.length);
       setCopied(which);
       setTimeout(() => setCopied(null), 2000);
     } catch {
@@ -90,6 +92,7 @@ export function SubscribeDialog({ open, onClose, filters, view, events }: Props)
         <div className="flex flex-col gap-3">
           <a
             href={webcal}
+            onClick={() => trackSubscribe('open', filters.interests.length)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-600"
           >
             Subscribe in my calendar app
@@ -116,7 +119,10 @@ export function SubscribeDialog({ open, onClose, filters, view, events }: Props)
           <div className="flex flex-col gap-2 border-t border-line pt-4 sm:flex-row">
             <button
               type="button"
-              onClick={() => downloadIcs(events, 'byu-campus-calendar.ics', `BYU — ${describe()}`)}
+              onClick={() => {
+                downloadIcs(events, 'byu-campus-calendar.ics', `BYU — ${describe()}`);
+                trackSubscribe('download', filters.interests.length);
+              }}
               className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink hover:bg-canvas"
             >
               <Download className="h-3.5 w-3.5" aria-hidden />
