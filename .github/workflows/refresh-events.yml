@@ -1,0 +1,47 @@
+# Re-pulls the BYU calendar daily and commits the snapshot, which triggers a Vercel deploy.
+#
+# Runs on GitHub's runners rather than in a Vercel function on purpose: calendar.byu.edu sits
+# behind CloudFront, which 403s some datacenter IP ranges, so the fetch is kept somewhere we can
+# see it fail loudly instead of degrading a live page.
+name: Refresh event snapshot
+
+on:
+  schedule:
+    - cron: '0 11 * * *' # 05:00 America/Denver (MDT) / 04:00 (MST)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Pull events
+        run: node scripts/fetch-events.mjs --days 270
+
+      - name: Verify the snapshot still builds and passes checks
+        run: |
+          npm ci
+          npm run smoke
+          npm run build
+
+      # Nothing to commit is the normal outcome on a quiet day, not a failure.
+      - name: Commit if changed
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet src/data/events.json; then
+            echo 'No calendar changes today.'
+            exit 0
+          fi
+          COUNT=$(node -e "process.stdout.write(String(require('./src/data/events.json').events.length))")
+          git add src/data/events.json
+          git commit -m "Refresh event snapshot ($COUNT events)"
+          git push
