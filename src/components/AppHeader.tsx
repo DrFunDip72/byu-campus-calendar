@@ -2,15 +2,17 @@ import { Rss, SlidersHorizontal } from 'lucide-react';
 import { SearchInput } from './InterestPanel';
 
 /**
- * Header for the three concept surfaces (Feed, Discover, Planner).
+ * Header for the purpose-built placement.
  *
- * It no longer carries the view switcher — that moved up into ViewSwitcher, which sits above every
- * surface including the two BYU recreations. This header is now just identity plus search, so the
- * BYU surfaces can render their own chrome underneath the switcher without competing with ours.
+ * It does not carry the surface switcher — that lives in SurfaceSwitcher, which sits above every
+ * placement including the two BYU recreations. This header is identity plus search, so the BYU
+ * placements can render their own chrome underneath the switcher without competing with ours.
  */
 interface Props {
-  /** The current view's name, so the header says which concept you are looking at. */
+  /** The placement's name. */
   title: string;
+  /** What the current layout is good at, so the header names both axes. */
+  subtitle?: string;
   query: string;
   setQuery: (q: string) => void;
   onOpenFilters: () => void;
@@ -20,6 +22,7 @@ interface Props {
 
 export function AppHeader({
   title,
+  subtitle,
   query,
   setQuery,
   onOpenFilters,
@@ -27,13 +30,18 @@ export function AppHeader({
   activeFilterCount
 }: Props) {
   return (
-    <header className="sticky top-[34px] z-30 border-b border-line bg-white/95 backdrop-blur">
+    // The sm: top offset clears the two-row surface switcher pinned above it. Below sm the
+    // switcher collapses to a single row and the sheet replaces it, so no offset is needed.
+    <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur sm:top-[62px]">
       <div className="bg-navy text-white">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3 px-4 py-2 sm:px-6">
           <a href="/" className="flex min-w-0 items-baseline gap-2">
             <span className="shrink-0 font-serif text-lg font-semibold tracking-tight">BYU</span>
             <span className="truncate text-sm font-medium text-navy-100">Campus Calendar</span>
             <span className="hidden text-xs text-navy-200 sm:inline">· {title}</span>
+            {subtitle && (
+              <span className="hidden truncate text-xs text-navy-300 lg:inline">· {subtitle}</span>
+            )}
           </a>
           <button
             type="button"

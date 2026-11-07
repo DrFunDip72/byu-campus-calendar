@@ -1,6 +1,6 @@
-import { CheckCircle2, CircleDashed, ExternalLink, X } from 'lucide-react';
-import { DATA } from '../lib/data';
-import { VIEWS, VIEW_GROUPS, viewsInGroup } from '../lib/views';
+import { CheckCircle2, CircleDashed, ExternalLink, FlaskConical, X } from 'lucide-react';
+import { DATA, DEMO_COUNT, REAL_COUNT } from '../lib/data';
+import { LAYOUTS, PLACEMENTS } from '../lib/views';
 
 /**
  * The honesty panel.
@@ -43,35 +43,61 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
 
         <section className="mb-6">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-            {VIEWS.length} views, one dataset
+            Two choices, nine combinations, one dataset
           </h3>
           <p className="mb-3 max-w-prose text-sm text-muted">
-            Switch between them in the bar at the top. The data, search, filters and calendar export
-            are identical in every one — only the presentation changes, so a decision between them is
-            a decision about students, not about features.
+            Navigation is two questions rather than a row of tabs, because they are genuinely
+            different questions:{' '}
+            <span className="font-semibold text-ink">where this would live</span> is a decision for
+            BYU, and <span className="font-semibold text-ink">how events are laid out</span> is a
+            decision for students. The data, search, filters and calendar export are identical in
+            all nine combinations, so choosing between them is never a choice about features.
           </p>
           <div className="flex flex-col gap-4">
-            {VIEW_GROUPS.map((group) => (
-              <div key={group.id}>
-                <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-navy-400">
-                  {group.label}
-                </h4>
-                <ul className="flex flex-col gap-2">
-                  {viewsInGroup(group.id).map((definition) => {
-                    const Icon = definition.icon;
-                    return (
-                      <li key={definition.id} className="flex items-start gap-2.5 text-sm">
-                        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-navy-400" aria-hidden />
-                        <span>
-                          <span className="font-semibold text-ink">{definition.title}</span>
-                          <span className="text-muted"> — {definition.blurb}.</span>
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
+            <div>
+              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-navy-400">
+                Where this lives
+              </h4>
+              <ul className="flex flex-col gap-2">
+                {PLACEMENTS.map((definition) => {
+                  const Icon = definition.icon;
+                  return (
+                    <li key={definition.id} className="flex items-start gap-2.5 text-sm">
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-navy-400" aria-hidden />
+                      <span>
+                        <span className="font-semibold text-ink">{definition.title}</span>
+                        <span className="text-muted"> — {definition.blurb}.</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            <div>
+              <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-navy-400">
+                Layout
+              </h4>
+              <ul className="flex flex-col gap-2">
+                {LAYOUTS.map((definition) => {
+                  const Icon = definition.icon;
+                  return (
+                    <li key={definition.id} className="flex items-start gap-2.5 text-sm">
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-navy-400" aria-hidden />
+                      <span>
+                        <span className="font-semibold text-ink">{definition.label}</span>
+                        <span className="text-muted"> — {definition.blurb}.</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                Today&rsquo;s BYU app shows a single day at a time, which is the gap the proposal is
+                built around. That original behaviour stays viewable at{' '}
+                <code className="rounded bg-canvas px-1">?mode=day</code> on the BYU App placement,
+                for a before-and-after comparison.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -99,13 +125,34 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
             ))}
           </ul>
           <p className="text-xs leading-relaxed text-muted">
-            {DATA.events.length} unique events after de-duplication, covering {DATA.windowDays} days.
+            <span className="font-semibold text-ink">{REAL_COUNT} real events</span> after
+            de-duplication, covering {DATA.windowDays} days, plus {DEMO_COUNT} stand-ins described
+            below.
             We request <code className="rounded bg-canvas px-1">categories=all</code>, which reaches
             events whose primary category is a department (School of Music, BRAVO! Events, Academic
             Calendar) and which the nine main category ids silently miss. Times are America/Denver.
             Last refreshed{' '}
             {updated.toLocaleString('en-US', { timeZone: 'America/Denver', dateStyle: 'medium', timeStyle: 'short' })} MT,
             and the snapshot re-pulls daily.
+          </p>
+        </section>
+
+        <section className="mb-6 rounded-lg border border-amber-200 bg-amber-50/60 p-3.5">
+          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-900">
+            <FlaskConical className="h-3.5 w-3.5" aria-hidden />
+            The {DEMO_COUNT} events marked DEMO
+          </h3>
+          <p className="max-w-prose text-sm leading-relaxed text-amber-900">
+            Every event badged <span className="font-semibold">DEMO</span> is an illustrative
+            stand-in, not a real BYU record. They exist because of a genuine chicken-and-egg
+            problem: BYU&rsquo;s public feed carries{' '}
+            <span className="font-semibold">zero hackathons, zero conferences</span> and a single
+            undifferentiated bucket of club events with no way to follow a named association — so
+            the headline feature here, following the things you actually care about, had almost
+            nothing real to act on. Adding nothing would have made the feature look pointless;
+            adding these quietly would have overstated the data. So they are present, labelled, and
+            excluded from the {REAL_COUNT} figure above. The clubs they represent are ones
+            BYU&rsquo;s own app already lists.
           </p>
         </section>
 
@@ -117,7 +164,7 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
             {[
               [
                 'Club and association events',
-                'The public calendar API does not carry them: zero matches for hackathons or the Product Management Association across all 626 records in 365 days. But BYU’s own mobile app does show them — Marketing Association, Pre-Nursing Association, Investment Banking Association — so the data exists inside BYU, just not on the public endpoint this reads. Connecting that one feed closes the single biggest gap here.'
+                `The public calendar API has no vocabulary for them. Across all ${REAL_COUNT} real records there are zero hackathons and no way to follow a named association — “clubs” is one flat bucket of about 15 events. But BYU’s own mobile app does show them, with a dedicated Club field: Marketing Association, Pre-Nursing Association, Cybersecurity Students Academic Association, Investment Banking Association. So the data already exists inside BYU; it is simply not on the public endpoint this reads. The ask is not “get clubs to publish” — it is read access to the feed BYU’s own app already uses.`
               ],
               [
                 'Most college and department calendars',

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Bookmark, BookmarkCheck, Clock, ExternalLink, MapPin, Tag, Ticket, Users, X } from 'lucide-react';
 import type { CampusEvent } from '../lib/types';
+import { DemoBadge } from './DemoBadge';
 import { INTEREST_LABELS } from '../lib/data';
 import { formatFull, formatPrice, formatTimeRange } from '../lib/format';
 import { AddToCalendar } from './AddToCalendar';
@@ -82,7 +83,10 @@ export function EventDetail({ event, onClose, saved, onSave }: Props) {
                 </span>
               )}
             </div>
-            <h1 className="font-serif text-2xl leading-tight text-ink">{event.title}</h1>
+            <h1 className="font-serif text-2xl leading-tight text-ink">
+              {event.title}
+              <DemoBadge event={event} />
+            </h1>
           </header>
 
           <dl className="flex flex-col gap-2.5 text-sm">

@@ -1,32 +1,33 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import { CalendarX2, Plus, SlidersHorizontal, X } from 'lucide-react';
+import { CalendarX2, Info, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { AppHeader } from './components/AppHeader';
 import { AboutDialog } from './components/AboutDialog';
 import { ByuFeatureBar, ByuFooter, ByuHeader } from './components/ByuChrome';
+import { CompareDialog } from './components/CompareDialog';
 import { EventDetail } from './components/EventDetail';
-import { InstallPrompt } from './components/InstallPrompt';
+import { FeedbackBar, FeedbackLink } from './components/FeedbackBar';
 import { SubscribeDialog } from './components/SubscribeDialog';
-import { ViewSwitcher, ViewsSheet } from './components/ViewSwitcher';
+import { SurfaceSwitcher, ViewsSheet } from './components/SurfaceSwitcher';
 import { ActiveFilterBar, InterestPanel } from './components/InterestPanel';
 import { ByuAppView } from './views/ByuAppView';
 import { CampusView } from './views/CampusView';
-import { FeedView } from './views/FeedView';
-import { DiscoverView } from './views/DiscoverView';
-import { PlannerView } from './views/PlannerView';
+import { LayoutRenderer } from './views/LayoutRenderer';
 import { applyFilters } from './lib/filters';
-import { DATA, EVENTS, INTEREST_LABELS } from './lib/data';
+import { DATA, DEMO_COUNT, EVENTS, INTEREST_LABELS, REAL_COUNT } from './lib/data';
 import { usePreferences } from './lib/prefs';
-import { viewById } from './lib/views';
-import { trackViewChange } from './lib/analytics';
-import type { CampusEvent, ViewId } from './lib/types';
+import { layoutById, placementById } from './lib/views';
+import { trackCompareOpen, trackLayoutChange, trackPlacementChange } from './lib/analytics';
+import { APP_MODE_FOR_LAYOUT } from './lib/types';
+import type { CampusEvent, LayoutId, PlacementId } from './lib/types';
 
 export default function App() {
   const {
-    view,
-    setView,
+    placement,
+    setPlacement,
+    layout,
+    setLayout,
     appMode,
-    setAppMode,
     filters,
     patch,
     toggleInterest,
@@ -36,14 +37,24 @@ export default function App() {
     toggleSaved
   } = usePreferences();
 
-  // Wrapped so every surface switch is recorded once, wherever it was triggered from. Which of
-  // the five surfaces people actually use is the single most useful number this project can report.
-  const changeView = useCallback(
-    (next: ViewId, via: 'switcher' | 'sheet' = 'switcher') => {
-      setView(next);
-      trackViewChange(next, via);
+  // Wrapped so every switch is recorded once, wherever it was triggered from. The two axes are
+  // tracked separately because they answer different questions — where this should live is the
+  // pitch question, which layout students prefer is the design question — and a single combined
+  // event would make neither answerable.
+  const changePlacement = useCallback(
+    (next: PlacementId, via: 'switcher' | 'sheet' | 'compare' = 'switcher') => {
+      setPlacement(next);
+      trackPlacementChange(next, via);
     },
-    [setView]
+    [setPlacement]
+  );
+
+  const changeLayout = useCallback(
+    (next: LayoutId, via: 'switcher' | 'sheet' | 'compare' = 'switcher') => {
+      setLayout(next);
+      trackLayoutChange(next, placement, via);
+    },
+    [setLayout, placement]
   );
 
   const [detail, setDetail] = useState<CampusEvent | null>(null);
@@ -51,7 +62,9 @@ export default function App() {
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [viewsOpen, setViewsOpen] = useState(false);
-  /** BYU Website surface only: which BYU category the nav has drilled into. */
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [feedbackSignal, setFeedbackSignal] = useState(0);
+  /** BYU Website placement only: which BYU category the nav has drilled into. */
   const [webCategory, setWebCategory] = useState<string | null>(null);
 
   // Recomputed on every filter or query change. The snapshot is small enough that filtering on
@@ -64,6 +77,14 @@ export default function App() {
     (filters.range !== 'all' ? 1 : 0) +
     (filters.freeOnly ? 1 : 0);
 
+  const openCompare = useCallback(
+    (from: string) => {
+      trackCompareOpen(from);
+      setCompareOpen(true);
+    },
+    []
+  );
+
   const panel = (
     <InterestPanel
       filters={filters}
@@ -75,22 +96,48 @@ export default function App() {
     />
   );
 
+  /**
+   * The honesty banner.
+   *
+   * Shown on every placement rather than tucked inside the About panel, because the stand-in
+   * events are visible on the first screen and a label that has to be hunted for is not a label.
+   * It also doubles as the pitch: the reason stand-ins are needed at all *is* the finding.
+   */
+  const demoBanner = DEMO_COUNT > 0 && (
+    <div className="border-b border-amber-200 bg-amber-50">
+      <p className="mx-auto flex max-w-[1200px] items-start gap-2 px-4 py-2 text-[11px] leading-snug text-amber-900 sm:px-6 sm:text-xs">
+        <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span>
+          <span className="font-semibold">{REAL_COUNT} real BYU events</span> pulled from the public
+          calendar API, plus <span className="font-semibold">{DEMO_COUNT} stand-ins marked DEMO</span>{' '}
+          — because that feed has no category for clubs, hackathons or any specific student
+          association.{' '}
+          <button
+            type="button"
+            onClick={() => setAboutOpen(true)}
+            className="font-semibold underline hover:no-underline"
+          >
+            Why that matters
+          </button>
+        </span>
+      </p>
+    </div>
+  );
+
   const emptyNotice = emptyInterests.length > 0 && (
     <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
       Nothing scheduled for{' '}
       <span className="font-semibold">
         {emptyInterests.map((id) => INTEREST_LABELS[id] ?? id).join(', ')}
       </span>{' '}
-      in the next {Math.round(DATA.windowDays / 30)} months from the sources we pull. Club-run events
-      are not connected yet —{' '}
+      in the next {Math.round(DATA.windowDays / 30)} months from the sources we pull.{' '}
       <button
         type="button"
         onClick={() => setAboutOpen(true)}
         className="font-semibold underline hover:no-underline"
       >
-        see coverage
+        See coverage
       </button>
-      .
     </p>
   );
 
@@ -104,19 +151,24 @@ export default function App() {
     />
   );
 
-  /** Rendered on every surface, so the switcher, filters and dialogs are always reachable. */
+  /** Rendered on every placement, so both axes and the dialogs are always reachable. */
   const shell = (
-    <>
-      <ViewSwitcher
-        view={view}
-        onViewChange={changeView}
-        onOpenFilters={() => setFiltersOpen(true)}
-        onOpenSubscribe={() => setSubscribeOpen(true)}
-        onOpenAbout={() => setAboutOpen(true)}
-        onOpenViews={() => setViewsOpen(true)}
-        activeFilterCount={activeFilterCount}
-      />
-    </>
+    <SurfaceSwitcher
+      placement={placement}
+      layout={layout}
+      onPlacementChange={changePlacement}
+      onLayoutChange={changeLayout}
+      onOpenFilters={() => setFiltersOpen(true)}
+      onOpenSubscribe={() => setSubscribeOpen(true)}
+      onOpenAbout={() => setAboutOpen(true)}
+      onOpenViews={() => setViewsOpen(true)}
+      onOpenCompare={() => openCompare('switcher')}
+      activeFilterCount={activeFilterCount}
+      // The whole snapshot, not the filtered result. The sentence's claim is that all nine
+      // combinations share one dataset; wiring it to the filter count made it read "Same 10 events
+      // and filters in all nine" the moment anyone narrowed anything.
+      eventCount={EVENTS.length}
+    />
   );
 
   const dialogs = (
@@ -131,34 +183,51 @@ export default function App() {
         open={subscribeOpen}
         onClose={() => setSubscribeOpen(false)}
         filters={filters}
-        view={view}
+        placement={placement}
+        layout={layout}
         events={events}
       />
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <ViewsSheet
         open={viewsOpen}
-        current={view}
-        onSelect={(next) => changeView(next, 'sheet')}
+        placement={placement}
+        layout={layout}
+        onPlacementChange={(next) => changePlacement(next, 'sheet')}
+        onLayoutChange={(next) => changeLayout(next, 'sheet')}
+        onOpenCompare={() => openCompare('sheet')}
         onClose={() => setViewsOpen(false)}
+      />
+      <CompareDialog
+        open={compareOpen}
+        events={events}
+        current={layout}
+        onPick={(next) => changeLayout(next, 'compare')}
+        onVote={(next) => trackLayoutChange(next, placement, 'compare')}
+        onClose={() => setCompareOpen(false)}
       />
       {filtersOpen && (
         <FilterSheet onClose={() => setFiltersOpen(false)} count={events.length}>
           {panel}
         </FilterSheet>
       )}
-      <InstallPrompt />
+      <FeedbackBar placement={placement} layout={layout} openSignal={feedbackSignal} />
+      {/* No install banner. BYU already ships a mobile app, so "add this to your home screen"
+          competes with the thing this proposal is trying to improve rather than supporting it. The
+          manifest and offline service worker stay — they cost nothing and make a flaky-signal
+          campus load faster — but nothing prompts for installation. */}
       {/* Vercel Web Analytics: page views, visitors, referrers. Cookie-free, so no consent banner. */}
       <Analytics />
     </>
   );
 
   // ---------------------------------------------------------------------------
-  // BYU Website — their chrome, our features.
+  // BYU Website — their chrome, our features, any of the three layouts.
   // ---------------------------------------------------------------------------
-  if (view === 'web') {
+  if (placement === 'web') {
     return (
       <div className="flex min-h-screen flex-col bg-white font-sans text-byu-charcoal">
         {shell}
+        {demoBanner}
         <ByuHeader
           activeCategory={webCategory}
           onSelectCategory={setWebCategory}
@@ -178,7 +247,9 @@ export default function App() {
           {emptyNotice && <div className="mb-4">{emptyNotice}</div>}
           {events.length === 0 ? (
             emptyState
-          ) : (
+          ) : layout === 'list' ? (
+            // The faithful recreation of calendar.byu.edu's own list is BYU's List layout. Swapping
+            // it for our generic one here would throw away the "this is your site today" evidence.
             <CampusView
               events={events}
               onOpen={setDetail}
@@ -186,6 +257,14 @@ export default function App() {
               onSave={toggleSaved}
               activeCategory={webCategory}
               onSelectCategory={setWebCategory}
+            />
+          ) : (
+            <LayoutRenderer
+              layout={layout}
+              events={events}
+              onOpen={setDetail}
+              saved={saved}
+              onSave={toggleSaved}
             />
           )}
         </main>
@@ -199,17 +278,19 @@ export default function App() {
   // ---------------------------------------------------------------------------
   // BYU App — their mobile Calendar tab, rebuilt around interests.
   // ---------------------------------------------------------------------------
-  if (view === 'app') {
+  if (placement === 'app') {
     return (
       <div className="flex min-h-screen flex-col bg-app-bg font-sans">
         {shell}
+        {demoBanner}
         <main className="flex flex-1 flex-col items-center px-0 py-0 sm:px-4 sm:py-6">
           {/* On a wide screen the app renders inside a phone frame with a caption, because a
               full-bleed "mobile app" on a projector reads as a website. */}
           <div className="hidden w-full max-w-[420px] pb-3 text-center sm:block">
             <p className="text-xs text-white/50">
-              The BYU app’s Calendar tab, rebuilt. Four layouts, interest filters, one-tap calendar
-              add.
+              The BYU app’s Calendar tab, rebuilt around interests. Today’s app shows one day at a
+              time — <span className="text-white/70">{layoutById(layout).label}</span> is the
+              proposal.
             </p>
           </div>
           <ByuAppView
@@ -217,8 +298,15 @@ export default function App() {
             onOpen={setDetail}
             saved={saved}
             onSave={toggleSaved}
-            mode={appMode}
-            onModeChange={setAppMode}
+            // `appMode` is only ever set by the `?mode=day` pitch escape hatch; normally the global
+            // layout drives the app's internal mode so the two axes stay honest.
+            mode={appMode ?? APP_MODE_FOR_LAYOUT[layout]}
+            onModeChange={(next) => {
+              const match = (Object.entries(APP_MODE_FOR_LAYOUT) as [LayoutId, string][]).find(
+                ([, mode]) => mode === next
+              );
+              if (match) changeLayout(match[0], 'switcher');
+            }}
             onOpenFilters={() => setFiltersOpen(true)}
             query={filters.query}
             onQueryChange={(query) => patch({ query })}
@@ -232,13 +320,15 @@ export default function App() {
   }
 
   // ---------------------------------------------------------------------------
-  // Our concepts — shared chrome with a persistent filter rail.
+  // Purpose-built — our own chrome with a persistent filter rail. The default.
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-canvas font-sans text-ink">
       {shell}
+      {demoBanner}
       <AppHeader
-        title={viewById(view).title}
+        title={placementById(placement).title}
+        subtitle={layoutById(layout).blurb}
         query={filters.query}
         setQuery={(query) => patch({ query })}
         onOpenFilters={() => setFiltersOpen(true)}
@@ -248,7 +338,7 @@ export default function App() {
 
       <div className="mx-auto flex max-w-[1400px] gap-6 px-4 py-4 sm:px-6">
         <aside className="hidden w-[268px] shrink-0 lg:block">
-          <div className="sticky top-[120px] max-h-[calc(100vh-140px)] overflow-y-auto pb-6 pr-1">
+          <div className="sticky top-[150px] max-h-[calc(100vh-170px)] overflow-y-auto pb-6 pr-1">
             {panel}
           </div>
         </aside>
@@ -266,12 +356,14 @@ export default function App() {
 
           {events.length === 0 ? (
             emptyState
-          ) : view === 'feed' ? (
-            <FeedView events={events} onOpen={setDetail} saved={saved} onSave={toggleSaved} />
-          ) : view === 'discover' ? (
-            <DiscoverView events={events} onOpen={setDetail} saved={saved} onSave={toggleSaved} />
           ) : (
-            <PlannerView events={events} onOpen={setDetail} saved={saved} onSave={toggleSaved} />
+            <LayoutRenderer
+              layout={layout}
+              events={events}
+              onOpen={setDetail}
+              saved={saved}
+              onSave={toggleSaved}
+            />
           )}
         </main>
       </div>
@@ -281,17 +373,22 @@ export default function App() {
       <button
         type="button"
         onClick={() => setSubscribeOpen(true)}
-        className="fixed bottom-5 right-4 z-30 inline-flex items-center gap-1.5 rounded-full bg-navy px-4 py-3 text-sm font-semibold text-white shadow-lift hover:bg-navy-600 sm:hidden"
+        className="fixed bottom-20 right-4 z-30 inline-flex items-center gap-1.5 rounded-full bg-navy px-4 py-3 text-sm font-semibold text-white shadow-lift hover:bg-navy-600 sm:hidden"
       >
         <Plus className="h-4 w-4" aria-hidden />
         Sync calendar
       </button>
 
-      <footer className="mx-auto max-w-[1400px] px-4 pb-24 pt-4 text-xs text-muted sm:px-6 sm:pb-8">
-        A student-built proposal. Event data from BYU, linking back to the official pages.{' '}
-        <button type="button" onClick={() => setAboutOpen(true)} className="font-medium text-royal hover:underline">
+      <footer className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-1 px-4 pb-36 pt-4 text-xs text-muted sm:px-6 sm:pb-28">
+        <span>A student-built proposal. Event data from BYU, linking back to the official pages.</span>
+        <button
+          type="button"
+          onClick={() => setAboutOpen(true)}
+          className="font-medium text-royal hover:underline"
+        >
           Sources and coverage
         </button>
+        <FeedbackLink onClick={() => setFeedbackSignal((n) => n + 1)} />
       </footer>
     </div>
   );

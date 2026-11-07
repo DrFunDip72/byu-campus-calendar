@@ -60,44 +60,86 @@ function renderWith(search) {
   return render();
 }
 
-console.log('\nViews render:');
-// Each surface asserts against the chrome it is supposed to render. The two BYU recreations carry
-// BYU's own wording; the three concepts carry ours.
-const VIEW_MARKERS = {
+console.log('\nSurfaces render:');
+// Each placement asserts against the chrome it is supposed to render. The two BYU recreations
+// carry BYU's own wording; the purpose-built one carries ours. Every layout is exercised in every
+// placement, because "all nine combinations work" is the claim the navigation rewrite makes.
+const PLACEMENT_MARKERS = {
   web: 'Events Calendar',
   app: 'Calendar',
-  feed: 'Campus Calendar',
-  discover: 'Campus Calendar',
-  planner: 'Campus Calendar'
+  standalone: 'Campus Calendar'
 };
-for (const [view, marker] of Object.entries(VIEW_MARKERS)) {
-  let html = '';
-  let error = null;
-  try {
-    html = renderWith(`?view=${view}`);
-  } catch (err) {
-    error = err;
+const LAYOUT_IDS = ['list', 'cards', 'month'];
+
+for (const [placement, marker] of Object.entries(PLACEMENT_MARKERS)) {
+  for (const layout of LAYOUT_IDS) {
+    let html = '';
+    let error = null;
+    try {
+      html = renderWith(`?placement=${placement}&layout=${layout}`);
+    } catch (err) {
+      error = err;
+    }
+    check(
+      `${placement} + ${layout} renders`,
+      !error && html.length > 5000,
+      error?.message ?? `${html.length} bytes`
+    );
+    check(`${placement} + ${layout} shows its own chrome`, html.includes(marker));
   }
-  check(`${view} renders`, !error && html.length > 5000, error?.message ?? `${html.length} bytes`);
-  check(`${view} shows its own chrome`, html.includes(marker));
-  // Every surface must offer the view switcher, or there is no way back out of it.
-  check(`${view} offers the view switcher`, html.includes('BYU Website') && html.includes('Planner'));
+}
+
+// Both axes must stay reachable from every surface, or there is no way back out of one.
+for (const placement of Object.keys(PLACEMENT_MARKERS)) {
+  const html = renderWith(`?placement=${placement}`);
+  check(
+    `${placement} offers both switcher axes`,
+    html.includes('Where this lives') && html.includes('Layout')
+  );
+  check(
+    `${placement} offers all three layout names`,
+    ['List', 'Cards', 'Month'].every((m) => html.includes(m))
+  );
 }
 
 console.log('\nNavigation:');
-// The retired `campus` id must still resolve, or links shared before the rename break.
+// The retired flat ids must still resolve, or links already shared publicly break. `campus` was
+// the original id for the BYU Website surface; `feed`/`discover`/`planner` were the concepts.
 check(
   'legacy ?design=campus still resolves to BYU Website',
   renderWith('?design=campus').includes('Events Calendar')
 );
 check('legacy ?design=feed still resolves', renderWith('?design=feed').includes('Campus Calendar'));
-const appHtml = renderWith('?view=app');
 check(
-  'app surface offers all four layouts',
-  ['Day', 'Feed', 'Discover', 'Month'].every((m) => appHtml.includes(m))
+  'legacy ?view=planner still resolves',
+  renderWith('?view=planner').includes('Campus Calendar')
 );
-check('app surface renders its bottom tab bar', appHtml.includes('Home') && appHtml.includes('Search'));
-check('app surface honours ?mode=month', renderWith('?view=app&mode=month').includes('Tap a day to open it'));
+check(
+  'legacy ?view=discover still resolves',
+  renderWith('?view=discover').includes('Campus Calendar')
+);
+// An explicit ?layout= must beat a legacy ?view= that implies a different one.
+check(
+  'explicit ?layout= overrides a legacy ?view=',
+  renderWith('?view=discover&layout=month').length > 5000
+);
+
+const appHtml = renderWith('?placement=app');
+check('app placement renders its bottom tab bar', appHtml.includes('Home') && appHtml.includes('Search'));
+// The day-only original stays reachable for a before/after comparison in a pitch.
+check(
+  'app placement honours the ?mode=day escape hatch',
+  renderWith('?placement=app&mode=day').length > 5000
+);
+check(
+  'app placement honours ?mode=month',
+  renderWith('?placement=app&mode=month').includes('Tap a day to open it')
+);
+
+// The comparison view is how a reviewer sees all three layouts without a memory test.
+const compareSource = readFileSync('src/components/CompareDialog.tsx', 'utf8');
+check('compare view renders all three layouts', compareSource.includes('LAYOUTS.map'));
+check('compare previews are inert', compareSource.includes('deliberately inert'));
 
 console.log('\nPWA:');
 const manifest = JSON.parse(readFileSync('public/manifest.webmanifest', 'utf8'));
@@ -116,6 +158,15 @@ check(
     .join(', ')
 );
 check('apple-touch-icon exists', existsSync('public/icons/apple-touch-icon.png'));
+// BYU already ships an app, so nothing may prompt a student to install this one. The manifest and
+// offline worker stay; the install banner was removed deliberately and must not creep back.
+check('no install prompt is shipped', !existsSync('src/components/InstallPrompt.tsx'));
+check(
+  'pwa.ts only registers the worker',
+  // Matches the listener, not the word: the file explains in prose why the install flow was
+  // removed, and that explanation should not trip its own guardrail.
+  !readFileSync('src/lib/pwa.ts', 'utf8').includes("addEventListener('beforeinstallprompt'")
+);
 const indexHtml = readFileSync('index.html', 'utf8');
 check('index.html links the manifest', indexHtml.includes('rel="manifest"'));
 check('index.html links an apple-touch-icon', indexHtml.includes('apple-touch-icon'));
@@ -126,7 +177,7 @@ console.log('\nFilters narrow results:');
 const snapshot = JSON.parse(readFileSync('src/data/events.json', 'utf8'));
 const football = snapshot.events.filter((e) => e.interests.includes('football'));
 
-const footballHtml = renderWith('?view=feed&interests=football');
+const footballHtml = renderWith('?layout=list&interests=football');
 check('football filter shows a football game', footballHtml.includes('Football vs.'));
 check(
   'football filter excludes basketball',
@@ -135,35 +186,96 @@ check(
 );
 check(`snapshot actually has football games`, football.length > 0, `${football.length} found`);
 
-const searchHtml = renderWith('?view=feed&q=notre%20dame');
-check('search finds "notre dame"', searchHtml.includes('Notre Dame'));
+// Derived from the snapshot rather than hardcoded. A literal opponent name ("notre dame") passed
+// until the pull window rolled past that game, then failed for a reason unrelated to search.
+const searchTarget = snapshot.events.find((e) => e.title.startsWith("Women's Basketball vs. "));
+const searchTerm = searchTarget ? searchTarget.title.split('vs. ')[1] : null;
+check('snapshot has a searchable opponent', Boolean(searchTerm), 'no basketball fixture found');
+if (searchTerm) {
+  const searchHtml = renderWith(`?layout=list&q=${encodeURIComponent(searchTerm)}`);
+  check(`search finds "${searchTerm}"`, searchHtml.includes(searchTerm));
+}
 
-const emptyHtml = renderWith('?view=feed&q=zzzzznotathing');
+const emptyHtml = renderWith('?layout=list&q=zzzzznotathing');
 check('a hopeless search shows the empty state', emptyHtml.includes('No events match'));
 
-const zeroCoverage = renderWith('?view=feed&interests=hackathon');
-check(
-  'a zero-coverage interest explains itself',
-  zeroCoverage.includes('Nothing scheduled for'),
-  'the empty-interest notice did not render'
-);
+// Also derived: `hackathon` used to be empty and is now covered by stand-ins, so hardcoding any
+// single interest here is a test that breaks the moment the data improves.
+const allInterests = snapshot.groups.flatMap((g) => g.interests.map((i) => i.id));
+const emptyInterest = allInterests.find((id) => (snapshot.interestCounts[id] ?? 0) === 0);
+check('snapshot still has an uncovered interest to test', Boolean(emptyInterest));
+if (emptyInterest) {
+  const zeroCoverage = renderWith(`?layout=list&interests=${emptyInterest}`);
+  check(
+    `an uncovered interest (${emptyInterest}) explains itself`,
+    zeroCoverage.includes('Nothing scheduled for'),
+    'the empty-interest notice did not render'
+  );
+}
 
-const multi = renderWith('?view=planner&interests=football,dance');
-check('planner renders a multi-interest selection', multi.includes('Planner') || multi.length > 5000);
+const multi = renderWith('?layout=month&interests=football,dance');
+check('month layout renders a multi-interest selection', multi.length > 5000);
 
 // The BYU Website surface recreates calendar.byu.edu, so its markers are BYU's, not ours.
-const web = renderWith('?view=web');
+const web = renderWith('?placement=web');
 check('web renders the BYU chrome', web.includes('Events Calendar') && web.includes('Submit an Event'));
 check('web renders the BYU footer', web.includes('All Rights Reserved'));
 check('web groups into category rows', web.includes('Full Schedule'));
 check('web exposes the added feature bar', web.includes('My interests') && web.includes('This weekend'));
-const webFiltered = renderWith('?view=web&interests=football');
+const webFiltered = renderWith('?placement=web&interests=football');
 check('web respects interest filters', webFiltered.includes('Football vs.') && !webFiltered.includes('Basketball vs.'));
-const appFiltered = renderWith('?view=app&interests=football');
+const appFiltered = renderWith('?placement=app&interests=football');
 check('app respects interest filters', appFiltered.includes('Football vs.') && !appFiltered.includes('Basketball vs.'));
 
-const freeHtml = renderWith('?view=discover&free=1');
+const freeHtml = renderWith('?layout=cards&free=1');
 check('discover renders with freeOnly', freeHtml.length > 5000);
+
+console.log('\nDemo-data honesty:');
+// The stand-ins are defensible only while they stay labelled. These checks are that guardrail.
+const demoEvents = snapshot.events.filter((e) => e.demo);
+check('snapshot carries stand-in events', demoEvents.length > 0, `${demoEvents.length} found`);
+check(
+  'demoCount matches the flagged events',
+  snapshot.demoCount === demoEvents.length,
+  `${snapshot.demoCount} declared vs ${demoEvents.length} flagged`
+);
+check('every stand-in is sourced as demo', demoEvents.every((e) => e.source === 'demo'));
+check('no stand-in claims a real BYU url', demoEvents.every((e) => e.url === null));
+// Every layout in every placement, not just one. The badge was first added by patching the first
+// `{event.title}` in each view, which silently missed the second card component in two of them —
+// so the cards layout shipped stand-ins with no label at all. Enumerating catches that class of
+// miss, which is the only thing keeping the stand-ins honest.
+for (const placement of ['web', 'app', 'standalone']) {
+  for (const layout of ['list', 'cards', 'month']) {
+    const html = renderWith(`?placement=${placement}&layout=${layout}&interests=club-pma,hackathon`);
+    check(
+      `${placement} + ${layout} labels its stand-ins`,
+      // Three legitimate markers: the inline badge where a title is rendered, the tooltip on
+      // compact chips and dots, and the data attribute on the app's month dots.
+      html.includes('>Demo<') ||
+        html.includes('not a real BYU event') ||
+        html.includes('data-demo="true"'),
+      'a stand-in rendered with no DEMO marker'
+    );
+  }
+}
+const demoHtml = renderWith('?layout=list&interests=club-pma');
+check('the honesty banner names the real count', demoHtml.includes('real BYU events'));
+check(
+  'the About panel discloses the stand-ins',
+  readFileSync('src/components/AboutDialog.tsx', 'utf8').includes('illustrative')
+);
+
+console.log('\nFeedback capture:');
+const feedbackApi = readFileSync('api/feedback.ts', 'utf8');
+check('feedback endpoint validates the verdict', feedbackApi.includes('must be "yes" or "no"'));
+check('feedback is stored privately', feedbackApi.includes("access: 'private'"));
+check('feedback stores no identifiers', !/\\b(ip|email|userAgent|user_agent)\\b/i.test(feedbackApi));
+const resultsApi = readFileSync('api/feedback-results.ts', 'utf8');
+check('results page requires a key', resultsApi.includes('FEEDBACK_ADMIN_KEY'));
+check('results page compares the key in constant time', resultsApi.includes('secretsMatch'));
+check('results page is noindex', resultsApi.includes('noindex'));
+check('results page escapes comment text', resultsApi.includes('escape(r.comment'));
 
 console.log('\nSnapshot integrity:');
 check('every event has a parseable start', snapshot.events.every((e) => !Number.isNaN(Date.parse(e.start))));

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppMode, Filters, ViewId } from './types';
+import type { AppMode, Filters, LayoutId, PlacementId } from './types';
 import { EMPTY_FILTERS } from './types';
-import { resolveView } from './views';
+import { isLayout, isPlacement, resolveLegacyView } from './views';
 import { trackFollowInterest } from './analytics';
 
 /**
@@ -24,17 +24,27 @@ const APP_MODES: AppMode[] = ['day', 'feed', 'discover', 'month'];
 interface StoredPrefs {
   interests: string[];
   myFeedOnly: boolean;
-  view: ViewId;
-  /** Which layout was last open inside the BYU App surface. */
-  appMode: AppMode;
+  placement: PlacementId;
+  layout: LayoutId;
+  /** Only ever non-default via the `?mode=day` pitch escape hatch. See types.ts. */
+  appMode: AppMode | null;
   saved: string[];
 }
 
+/**
+ * The purpose-built calendar is the default, not the BYU Website recreation.
+ *
+ * The first version opened on the BYU Website skin, which meant the first thing a student saw was
+ * a faithful copy of the page they already find inadequate — the proposal's own improvements were
+ * a tab away. Leading with the purpose-built surface shows the idea at full strength; the BYU
+ * skins are then the answer to "but would it fit?", which is a pitch question, not a student one.
+ */
 const DEFAULTS: StoredPrefs = {
   interests: [],
   myFeedOnly: true,
-  view: 'web',
-  appMode: 'day',
+  placement: 'standalone',
+  layout: 'list',
+  appMode: null,
   saved: []
 };
 
@@ -42,15 +52,25 @@ function readStorage(): StoredPrefs {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULTS;
-    const parsed = JSON.parse(raw) as Partial<StoredPrefs>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+    // A preference saved before the two-axis rewrite holds a single `view` id. Map it onto a cell
+    // of the matrix rather than resetting, so a returning student lands where they left off.
+    const legacy = resolveLegacyView(parsed.view as string);
+
     return {
-      interests: Array.isArray(parsed.interests) ? parsed.interests.filter((x) => typeof x === 'string') : [],
+      interests: Array.isArray(parsed.interests)
+        ? (parsed.interests as unknown[]).filter((x): x is string => typeof x === 'string')
+        : [],
       myFeedOnly: typeof parsed.myFeedOnly === 'boolean' ? parsed.myFeedOnly : true,
-      // resolveView also maps the retired `campus` id onto `web`, so a preference saved before the
-      // rename still restores the right surface instead of silently resetting.
-      view: resolveView(parsed.view as string) ?? 'web',
-      appMode: APP_MODES.includes(parsed.appMode as AppMode) ? (parsed.appMode as AppMode) : 'day',
-      saved: Array.isArray(parsed.saved) ? parsed.saved.filter((x) => typeof x === 'string') : []
+      placement: isPlacement(parsed.placement)
+        ? parsed.placement
+        : (legacy?.placement ?? DEFAULTS.placement),
+      layout: isLayout(parsed.layout) ? parsed.layout : (legacy?.layout ?? DEFAULTS.layout),
+      appMode: APP_MODES.includes(parsed.appMode as AppMode) ? (parsed.appMode as AppMode) : null,
+      saved: Array.isArray(parsed.saved)
+        ? (parsed.saved as unknown[]).filter((x): x is string => typeof x === 'string')
+        : []
     };
   } catch {
     // Private-browsing mode and a corrupt value both land here; defaults are the right answer.
@@ -103,23 +123,42 @@ function filtersFromUrl(): Partial<Filters> | null {
   return found ? out : null;
 }
 
-/** `?view=` is canonical; `?design=` is still read so links shared before the rename keep working. */
-export function viewFromUrl(): ViewId | null {
+/**
+ * `?placement=` and `?layout=` are canonical.
+ *
+ * `?view=` and the older `?design=` carried the retired flat surface ids and are still honoured,
+ * because links using them have already been shared publicly. An explicit `?placement=` or
+ * `?layout=` beats the legacy pair when both appear.
+ */
+export function surfaceFromUrl(): { placement: PlacementId | null; layout: LayoutId | null } {
   const params = new URLSearchParams(window.location.search);
-  return resolveView(params.get('view')) ?? resolveView(params.get('design'));
+  const legacy = resolveLegacyView(params.get('view')) ?? resolveLegacyView(params.get('design'));
+  const placement = params.get('placement');
+  const layout = params.get('layout');
+  return {
+    placement: isPlacement(placement) ? placement : (legacy?.placement ?? null),
+    layout: isLayout(layout) ? layout : (legacy?.layout ?? null)
+  };
 }
 
+/** The `?mode=day` escape hatch that keeps today's day-only BYU app demonstrable. */
 export function appModeFromUrl(): AppMode | null {
   const value = new URLSearchParams(window.location.search).get('mode') as AppMode | null;
   return value && APP_MODES.includes(value) ? value : null;
 }
 
 /** Serializes filters into a query string, omitting anything at its default. */
-export function filtersToQuery(filters: Filters, view?: ViewId, appMode?: AppMode): string {
+export function filtersToQuery(
+  filters: Filters,
+  placement?: PlacementId,
+  layout?: LayoutId,
+  appMode?: AppMode | null
+): string {
   const params = new URLSearchParams();
-  if (view) params.set('view', view);
-  // Only meaningful on the App surface, and only worth serializing when it is not the default.
-  if (view === 'app' && appMode && appMode !== 'day') params.set('mode', appMode);
+  if (placement) params.set('placement', placement);
+  if (layout) params.set('layout', layout);
+  // Only meaningful on the App placement, and only when deliberately pinned.
+  if (placement === 'app' && appMode) params.set('mode', appMode);
   if (filters.interests.length) params.set('interests', filters.interests.join(','));
   if (filters.orgs.length) params.set('orgs', filters.orgs.join(','));
   if (filters.query) params.set('q', filters.query);
@@ -133,16 +172,26 @@ export function usePreferences() {
   const initial = useRef<StoredPrefs>();
   if (!initial.current) initial.current = readStorage();
 
-  const [view, setView] = useState<ViewId>(() => viewFromUrl() ?? initial.current!.view);
-  const [appMode, setAppMode] = useState<AppMode>(() => appModeFromUrl() ?? initial.current!.appMode);
+  const fromUrl = useRef<ReturnType<typeof surfaceFromUrl>>();
+  if (!fromUrl.current) fromUrl.current = surfaceFromUrl();
+
+  const [placement, setPlacement] = useState<PlacementId>(
+    () => fromUrl.current!.placement ?? initial.current!.placement
+  );
+  const [layout, setLayout] = useState<LayoutId>(
+    () => fromUrl.current!.layout ?? initial.current!.layout
+  );
+  const [appMode, setAppMode] = useState<AppMode | null>(
+    () => appModeFromUrl() ?? initial.current!.appMode
+  );
 
   const [filters, setFilters] = useState<Filters>(() => {
-    const fromUrl = filtersFromUrl();
+    const urlFilters = filtersFromUrl();
     return {
       ...EMPTY_FILTERS,
       interests: initial.current!.interests,
       myFeedOnly: initial.current!.myFeedOnly,
-      ...(fromUrl ?? {})
+      ...(urlFilters ?? {})
     };
   });
 
@@ -151,16 +200,23 @@ export function usePreferences() {
   // Persist the durable bits. `query` and `range` are deliberately not persisted: a search box that
   // still holds last week's query on a fresh visit feels broken.
   useEffect(() => {
-    writeStorage({ interests: filters.interests, myFeedOnly: filters.myFeedOnly, view, appMode, saved });
-  }, [filters.interests, filters.myFeedOnly, view, appMode, saved]);
+    writeStorage({
+      interests: filters.interests,
+      myFeedOnly: filters.myFeedOnly,
+      placement,
+      layout,
+      appMode,
+      saved
+    });
+  }, [filters.interests, filters.myFeedOnly, placement, layout, appMode, saved]);
 
   // Keep the address bar in sync so the current view is always copy-pasteable. replaceState rather
   // than pushState: filter tweaks should not fill up the back button.
   useEffect(() => {
-    const query = filtersToQuery(filters, view, appMode);
+    const query = filtersToQuery(filters, placement, layout, appMode);
     const next = `${window.location.pathname}${query ? `?${query}` : ''}`;
     window.history.replaceState(null, '', next);
-  }, [filters, view, appMode]);
+  }, [filters, placement, layout, appMode]);
 
   const toggleInterest = useCallback((id: string) => {
     setFilters((f) => {
@@ -194,8 +250,10 @@ export function usePreferences() {
   );
 
   return {
-    view,
-    setView,
+    placement,
+    setPlacement,
+    layout,
+    setLayout,
     appMode,
     setAppMode,
     filters,

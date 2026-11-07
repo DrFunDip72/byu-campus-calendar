@@ -5,6 +5,17 @@ export const DATA = snapshot as unknown as EventSnapshot;
 
 export const EVENTS: CampusEvent[] = DATA.events;
 
+/**
+ * Real and illustrative counts, kept separate everywhere they are shown.
+ *
+ * The headline number quoted publicly must be the real one. Lumping the stand-ins into a single
+ * total would overstate what BYU's public feed actually exposes, which is the opposite of the
+ * point the demo events exist to make. See scripts/seed-demo.mjs.
+ */
+export const DEMO_COUNT = EVENTS.filter((e) => e.demo).length;
+
+export const REAL_COUNT = EVENTS.length - DEMO_COUNT;
+
 export const INTEREST_GROUPS = DATA.groups;
 
 /** id -> label, for rendering a chip from an event's interest ids. */

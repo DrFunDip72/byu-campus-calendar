@@ -489,3 +489,215 @@ answers no question at all. Follows are tracked but not unfollows; search text i
 
 **Nothing identifying is collected.** No user id, no search strings, no event titles. The only
 values sent are fixed vocabulary from our own code — view ids, interest ids, and a calendar target.
+
+
+---
+
+## 18. Navigation: splitting one row of tabs into two labelled axes
+
+**The problem, in the user's words:** *"I'd be confused how to explain this to someone, because
+there's the Feed Discover Planner, then there's BYU website, then there's BYU app with the Feed
+Discover month day."*
+
+That is the whole diagnosis. The flat switcher — `BYU Website · BYU App · Feed · Discover ·
+Planner` — had two defects that compounded:
+
+1. **It collapsed two unrelated questions into one control.** "Where would this live?" is a
+   decision for BYU. "How should events be arranged?" is a decision for students. Putting both in
+   one row implied they were alternatives to each other, which they are not.
+2. **The same word meant two things.** The BYU App surface had its own internal Feed / Discover /
+   Month modes. So "Feed" was simultaneously a top-level surface *and* a mode inside a different
+   top-level surface. No sentence was true about the whole bar.
+
+The test a navigation scheme has to pass here is unusual and strict: the person who built it has
+to be able to describe it out loud, in one breath, to a stranger on LinkedIn. The old one failed
+that test, which is a product failure regardless of how well each individual surface worked.
+
+**What we did.** Two named axes, printed as labels in the bar rather than left implicit:
+
+```
+WHERE THIS LIVES   [ Today's BYU Website ] [ Today's BYU App ] [ A purpose-built calendar ]
+LAYOUT             [ List ] [ Cards ] [ Month ]
+
+          Same 496 events and filters in all nine — pick where it lives and how it looks.
+```
+
+That last line is rendered in the switcher itself. It is the deliverable: if it is true and
+legible, the nine combinations read as one idea instead of nine pages.
+
+**Renames, and why.** `Feed → List`, `Discover → Cards`, `Planner → Month`. The old names were
+brand words a student had to learn before they could express a preference, and `Feed` was the
+collision. The new ones are self-describing, so the question "which do you prefer?" needs no
+glossary — which matters when the answer is the data being collected.
+
+**Every layout works in every placement.** Nine real combinations, not a ragged grid. This cost
+real work — the BYU Website placement previously had exactly one layout — but an exception would
+have reintroduced the thing we just removed: a tab that behaves unlike its neighbours and has to
+be explained separately.
+
+The faithful recreation of `calendar.byu.edu`'s own list is kept as the BYU Website placement's
+**List** layout rather than being replaced by the generic one. That recreation is the evidence for
+"this is your site today"; swapping it out would throw the evidence away to gain consistency
+nobody asked for.
+
+### Rejected alternatives
+
+**Keep five tabs, just rename the app's internal modes.** Cheapest, and fixes the collision. But
+it leaves a visitor needing to understand five unrelated surfaces before forming an opinion about
+any of them, which was the actual complaint. Fixes the symptom, not the cause.
+
+**One default layout plus a separate `/compare` page.** Genuinely tempting, and the least
+confusing thing for a student. Rejected as the *primary* structure because the BYU-skin
+placements are the entire pitch to leadership — demoting them to a secondary page optimises for
+one audience by disabling the other. We took the idea anyway and added Compare alongside the
+matrix, which turned out to be the better half of the suggestion.
+
+**Separate deployments per design.** Rejected for the same reasons as the first time: three copies
+of the ingest, taxonomy, filter engine and calendar export, three URLs for whoever is being
+pitched, and preferences that do not follow you between them.
+
+### What the default is now, and why it changed
+
+The app used to open on the BYU Website recreation. It now opens on the purpose-built calendar.
+
+Opening on the BYU skin meant the first thing a student saw was a faithful copy of the page they
+already find inadequate, with every improvement one tab away. Leading with the purpose-built
+surface shows the idea at full strength; the BYU skins then answer "but would it fit?", which is a
+question BYU asks, not a question a student asks.
+
+### Backward compatibility
+
+The five retired ids plus the original `campus` are mapped onto cells of the matrix in
+`LEGACY_VIEWS`, and read from `?view=`, `?design=`, and from `view` in existing localStorage. An
+explicit `?placement=`/`?layout=` beats a legacy id when both appear. Links already shared
+publicly keep working, and a returning student lands where they left off instead of being reset.
+
+`day` — the BYU app's authentic single-day list — is deliberately *not* a fourth global layout,
+since it would exist in only one placement. It stays reachable at `?placement=app&mode=day` so the
+before/after can be shown in a pitch, and the About panel says so.
+
+---
+
+## 19. Comparison: three layouts at once
+
+A switcher can only show one layout at a time, so comparing them is a memory test — click, scroll,
+remember, click, scroll, try to recall how the first one felt. Asked for an opinion that way,
+people reliably name the one they saw last.
+
+**Compare** renders all three side by side with live data, each captioned with what it is good at,
+each with "I prefer this" and "Open". Previews are capped in height and scrollable, so each column
+shows its character without the page becoming three full-length feeds end to end.
+
+Two details that are not obvious:
+
+- **All three previews use the purpose-built chrome**, even when opened from a BYU placement. The
+  question being asked is which *arrangement* reads best; wrapping each column in different chrome
+  would change two variables at once and answer neither question.
+- **Buttons inside previews are disabled, not the container.** `pointer-events-none` on the
+  wrapper would also kill scrolling, and scrolling is how a layout gets judged. Without this, the
+  per-event "Add to calendar" controls stay live and a stray click opens a menu on top of the
+  comparison.
+
+It also gives the project a single screenshot that communicates the whole idea, which a
+one-at-a-time switcher structurally cannot produce.
+
+---
+
+## 20. Illustrative stand-in events
+
+**The problem.** The headline feature is following the things you actually care about. Run the
+ingest and ask what a student can actually follow: `hackathon` **0 events**, `conference`
+**0 events**, and `clubs` is a single flat bucket of ~15 with no way to follow a named
+association. The four examples the brief named — football, basketball, Product Management
+Association, hackathons, dance — are *half unfilterable*. The feature demos as pointless, not
+because it is pointless but because the public feed has no vocabulary for the things people want.
+
+This is a chicken-and-egg problem, and both obvious answers are bad. Ship nothing and the most
+important feature looks like a toy. Ship stand-ins quietly and the demo overstates what BYU's data
+actually contains — in a pitch to the people who own that data, which is the worst possible
+audience to mislead.
+
+**What we did.** 20 stand-ins, every one labelled, with the labelling treated as load-bearing:
+
+- `demo: true` on the record, `source: 'demo'`, and `url: null` — a stand-in never claims a real
+  BYU page.
+- A **DEMO** badge beside the title in every layout in every placement.
+- Compact surfaces that cannot fit a badge get an equivalent: a dotted outline on month-grid chips,
+  a hollow dot in the BYU app's month grid — because a filled dot still asserts that *something* is
+  happening that day, and the grid must not silently inflate how busy a real day looks.
+- A persistent amber banner on every surface naming the real count and the stand-in count.
+- A dedicated section in the About panel explaining why they exist.
+- Excluded from the headline figure everywhere. The number quoted publicly is **476 real events**.
+
+**The clubs chosen are not invented from nothing.** They are ones BYU's own mobile app already
+lists — Marketing Association, Pre-Nursing, Cybersecurity, Investment Banking — which is what makes
+them evidence rather than decoration. Named clubs get their own interest group (`club-orgs`)
+instead of being buried under `student-life`, because per-club granularity is precisely the
+capability BYU's public feed lacks, and hiding it among `social` and `craft` would conceal the
+thing being proposed.
+
+**The guardrail.** The smoke suite enumerates all nine combinations and asserts each one labels
+its stand-ins. This is not theoretical: the badge was first added by patching the first
+`{event.title}` in each view, which silently missed the *second* card component in two of them —
+so the Cards layout shipped stand-ins with no label at all until the enumerating test caught it.
+The stand-ins are defensible only while they stay labelled, so that test is the thing keeping them
+honest.
+
+---
+
+## 21. Feedback capture: Vercel Blob, one blob per response
+
+**Why collect it in the product at all.** "Tell me what you think" on a social post returns a
+handful of comments from people who already like you. Asking inside the product, right after
+someone has used it, returns a number — and a number is what both a pitch and an interview need.
+"64% of 71 students picked the list layout" is an argument; "people seemed to like it" is not.
+
+**Storage.** Each response is its own small blob under `feedback/`. The alternatives and why they
+lost:
+
+| Option | Why not |
+| --- | --- |
+| One JSON file in storage | Read-modify-write. Two students submitting at once silently overwrite each other. |
+| Free Postgres / Supabase | Auto-pauses after about a week idle and needs a *manual* restore. Responses would vanish weeks into a feedback window, exactly when nobody is watching. |
+| Neon | Auto-resumes, so the pause problem is milder — but it is another provisioned service and connection budget for what is a handful of rows. |
+| Google Form only | Reliable and zero-infra, but it asks people to leave the page, and response rates collapse. |
+
+Blob is append-only by construction, so there is no race. Nothing pools connections, nothing needs
+keeping warm, and nothing pauses. The cost is that aggregation means listing and reading N objects
+rather than one query — a non-issue at tens-to-hundreds of responses, and the results endpoint
+caps its read at 300 anyway.
+
+**Recorded twice, on purpose.** A Blob write for the written comments, an analytics event for the
+count. The count has to survive a storage failure; the comments cannot be reconstructed from a
+count. Neither alone is sufficient, and the duplication is cheap.
+
+**Privacy.** No name, email, sign-in, IP or user agent — not collected, not derived. The store is
+private, so no response is reachable by URL. The comment box says so, because a student writing
+criticism of their own university should not have to wonder.
+
+**Reading it.** `/api/feedback-results?key=…` renders a self-contained HTML page: verdict split,
+preferred-layout bars, who answered, and every comment. No client JavaScript, no build step, and
+readable on a phone — which matters, because the moment he will want to check it is right after
+posting the link. The key is compared in constant time and the page is `noindex`; the thing being
+protected is the aggregate, since the responses are anonymous by construction.
+
+**Asked late, asked once.** The bar appears after 25 seconds — long enough that someone has
+actually looked at events — opens with a single thumbs-up/down, and only then asks the other three
+questions. Dismissal and submission are both remembered locally. A four-field form up front gets
+abandoned; one binary question costs nothing and earns the right to ask the rest.
+
+---
+
+## 22. Removing the install prompt
+
+The PWA install banner has been removed. The manifest and offline service worker stay.
+
+BYU already ships a mobile app, and one of the three placements is a proposal for *that app's*
+calendar tab. Prompting a student to install a second, student-built app alongside it argues
+against the pitch — the goal is to become part of BYU's products, not to compete with them for a
+home-screen slot. "Installs to your phone like an app" was also about to go into a public post
+about the project, where it would have muddied the ask.
+
+What the service worker still earns: campus wifi is unreliable, and a cached shell means the
+calendar opens in a building with bad signal. `/feed.ics` is never cached, because a stale
+subscription silently stops updating. The smoke suite asserts that no install prompt creeps back.

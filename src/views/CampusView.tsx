@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import type { CampusEvent } from '../lib/types';
+import { DemoBadge } from '../components/DemoBadge';
 import { INTEREST_LABELS } from '../lib/data';
 import { excerpt, formatPrice, formatTime } from '../lib/format';
 import { AddToCalendar } from '../components/AddToCalendar';
@@ -338,6 +339,7 @@ function PromoCard({
 
         <h3 className="mb-2.5 text-[20px] font-semibold leading-[1.25] text-byu-navy group-hover:underline">
           {event.title}
+          <DemoBadge event={event} />
         </h3>
 
         <div className="mb-2.5 flex flex-col gap-0.5 text-[11px] font-light uppercase leading-[1.27] tracking-[0.5px] text-byu-charcoal">

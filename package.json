@@ -9,10 +9,13 @@
     "preview": "vite preview",
     "refresh": "node scripts/fetch-events.mjs --days 270",
     "smoke": "node scripts/smoke.mjs",
-    "audit": "node scripts/audit-taxonomy.mjs"
+    "audit": "node scripts/audit-taxonomy.mjs",
+    "seed": "node scripts/seed-demo.mjs",
+    "build:data": "npm run refresh && npm run seed"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
+    "@vercel/blob": "^2.8.2",
     "date-fns": "^4.1.0",
     "lucide-react": "0.522.0",
     "react": "^18.3.1",

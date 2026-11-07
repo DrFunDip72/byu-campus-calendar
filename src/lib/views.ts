@@ -1,104 +1,149 @@
-import { CalendarDays, Globe, LayoutGrid, List, Smartphone, type LucideIcon } from 'lucide-react';
-import type { ViewId } from './types';
+import {
+  CalendarDays,
+  Globe,
+  LayoutGrid,
+  List,
+  Monitor,
+  Smartphone,
+  type LucideIcon
+} from 'lucide-react';
+import type { LayoutId, PlacementId, ViewId } from './types';
 
 /**
- * The single registry of surfaces: ids, names, grouping and one-line descriptions.
+ * The surface registry, as two independent axes.
  *
- * Everything that names a view — the desktop switcher, the mobile Views sheet, the About panel,
- * the smoke test — reads from here, so a view cannot be renamed in one place and stale in another.
+ * The first cut of this project had one flat row of five tabs — BYU Website, BYU App, Feed,
+ * Discover, Planner — and it could not be explained out loud. Two different questions were
+ * collapsed into one control ("where would this live?" and "how are events laid out?"), and worse,
+ * the BYU App surface had its *own* internal Feed/Discover/Month, so the word "Feed" meant two
+ * different things depending on which tab you were in. A reviewer had to build a mental model of
+ * five unrelated things before they could form an opinion about any of them.
  *
- * The naming is the point. "Design 1 / Design 2" told a reviewer nothing; these names say what each
- * surface *is* and, through the group, why it exists.
+ * So the axes are now separate and named:
+ *
+ *   PLACEMENT — where this would live. Answers the pitch question.
+ *   LAYOUT    — how events are arranged. Answers the student question.
+ *
+ * Every placement supports every layout, which is the part that makes it explainable:
+ * "Same events, same filters. You pick where it lives and how it looks." No exceptions to
+ * caveat, no tab that behaves unlike its neighbours.
  */
 
-export interface ViewDefinition {
-  id: ViewId;
+export interface PlacementDefinition {
+  id: PlacementId;
   /** Short name for the switcher chip. */
   label: string;
-  /** Full name used in the Views sheet and About panel. */
+  /** Full name used in the sheet, compare page and About panel. */
   title: string;
   blurb: string;
-  /** What this layout is best at, for the Views sheet. */
+  /** Why this placement exists, for the Views sheet. */
   bestFor: string;
   icon: LucideIcon;
-  group: ViewGroupId;
 }
 
-export type ViewGroupId = 'byu' | 'concept';
+export interface LayoutDefinition {
+  id: LayoutId;
+  label: string;
+  blurb: string;
+  bestFor: string;
+  icon: LucideIcon;
+}
 
-export const VIEW_GROUPS: { id: ViewGroupId; label: string; caption: string }[] = [
-  {
-    id: 'byu',
-    label: "Inside BYU's products",
-    caption: 'The same data and features, wearing BYU’s existing design.'
-  },
-  {
-    id: 'concept',
-    label: 'Our concepts',
-    caption: 'What a purpose-built campus calendar could be.'
-  }
-];
-
-export const VIEWS: ViewDefinition[] = [
+export const PLACEMENTS: PlacementDefinition[] = [
   {
     id: 'web',
-    label: 'BYU Website',
-    title: 'BYU Website',
-    blurb: "calendar.byu.edu's layout, with our search, filters and calendar sync added",
+    label: "BYU Website",
+    title: "Today's BYU Website",
+    blurb: "calendar.byu.edu's own chrome, with our search, filters and calendar sync added",
     bestFor: 'Showing leadership this fits the site they already run',
-    icon: Globe,
-    group: 'byu'
+    icon: Globe
   },
   {
     id: 'app',
     label: 'BYU App',
-    title: 'BYU App',
-    blurb: "The BYU app's Calendar tab, rebuilt around interests — with four layouts inside it",
-    bestFor: 'Showing the same idea where students actually are: their phone',
-    icon: Smartphone,
-    group: 'byu'
+    title: "Today's BYU App",
+    blurb: "The BYU app's Calendar tab, rebuilt around interests",
+    bestFor: 'Showing the same idea where students already are: their phone',
+    icon: Smartphone
   },
   {
-    id: 'feed',
-    label: 'Feed',
-    title: 'Feed',
-    blurb: 'A dense, scannable list grouped by day',
-    bestFor: 'Answering “what’s on today?” fast — about 12 events per screen',
-    icon: List,
-    group: 'concept'
-  },
-  {
-    id: 'discover',
-    label: 'Discover',
-    title: 'Discover',
-    blurb: 'Image-led cards and rails for browsing',
-    bestFor: 'Finding something you didn’t know you wanted',
-    icon: LayoutGrid,
-    group: 'concept'
-  },
-  {
-    id: 'planner',
-    label: 'Planner',
-    title: 'Planner',
-    blurb: 'A month grid with a day panel',
-    bestFor: 'Seeing density and conflicts before committing',
-    icon: CalendarDays,
-    group: 'concept'
+    id: 'standalone',
+    label: 'Purpose-built',
+    title: 'A purpose-built calendar',
+    blurb: 'What we would build given a free hand, unconstrained by either existing product',
+    bestFor: 'Seeing the idea at its best before deciding where to put it',
+    icon: Monitor
   }
 ];
 
-export const VIEW_IDS = VIEWS.map((v) => v.id);
+/**
+ * Deliberately plain names. The previous set — Feed, Discover, Planner — were brand words a
+ * student had to learn before they could say which one they preferred, and "Feed" collided with
+ * the BYU App's internal mode of the same name. List / Cards / Month need no explanation.
+ */
+export const LAYOUTS: LayoutDefinition[] = [
+  {
+    id: 'list',
+    label: 'List',
+    blurb: 'Dense and scannable, grouped by day',
+    bestFor: 'Answering “what’s on today?” fast — about 12 events per screen',
+    icon: List
+  },
+  {
+    id: 'cards',
+    label: 'Cards',
+    blurb: 'Image-led cards and rails for browsing',
+    bestFor: 'Finding something you didn’t know you wanted',
+    icon: LayoutGrid
+  },
+  {
+    id: 'month',
+    label: 'Month',
+    blurb: 'A month grid with a day panel',
+    bestFor: 'Seeing density and conflicts before committing',
+    icon: CalendarDays
+  }
+];
 
-/** Older ids that still appear in shared links and saved preferences. */
-export const VIEW_ALIASES: Record<string, ViewId> = { campus: 'web' };
+export const PLACEMENT_IDS = PLACEMENTS.map((p) => p.id);
+export const LAYOUT_IDS = LAYOUTS.map((l) => l.id);
 
-export function resolveView(value: string | null | undefined): ViewId | null {
-  if (!value) return null;
-  if ((VIEW_IDS as string[]).includes(value)) return value as ViewId;
-  return VIEW_ALIASES[value] ?? null;
+export const placementById = (id: PlacementId): PlacementDefinition =>
+  PLACEMENTS.find((p) => p.id === id) ?? PLACEMENTS[0];
+
+export const layoutById = (id: LayoutId): LayoutDefinition =>
+  LAYOUTS.find((l) => l.id === id) ?? LAYOUTS[0];
+
+export function isPlacement(value: unknown): value is PlacementId {
+  return typeof value === 'string' && (PLACEMENT_IDS as string[]).includes(value);
 }
 
-export const viewById = (id: ViewId): ViewDefinition =>
-  VIEWS.find((v) => v.id === id) ?? VIEWS[0];
+export function isLayout(value: unknown): value is LayoutId {
+  return typeof value === 'string' && (LAYOUT_IDS as string[]).includes(value);
+}
 
-export const viewsInGroup = (group: ViewGroupId) => VIEWS.filter((v) => v.group === group);
+/**
+ * The five retired surface ids, each resolved to its cell in the new matrix.
+ *
+ * These still arrive from three places: links already shared publicly, `?design=` links older
+ * still, and `view` values sitting in returning students' localStorage. All of them must land
+ * somewhere sensible rather than silently resetting to the default.
+ */
+const LEGACY_VIEWS: Record<string, { placement: PlacementId; layout: LayoutId }> = {
+  campus: { placement: 'web', layout: 'list' },
+  web: { placement: 'web', layout: 'list' },
+  app: { placement: 'app', layout: 'list' },
+  feed: { placement: 'standalone', layout: 'list' },
+  discover: { placement: 'standalone', layout: 'cards' },
+  planner: { placement: 'standalone', layout: 'month' }
+};
+
+export function resolveLegacyView(
+  value: string | null | undefined
+): { placement: PlacementId; layout: LayoutId } | null {
+  if (!value) return null;
+  return LEGACY_VIEWS[value] ?? null;
+}
+
+/** Retained only so old saved preferences and shared links can still be interpreted. */
+export type { ViewId };

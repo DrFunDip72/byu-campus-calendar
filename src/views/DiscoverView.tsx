@@ -1,5 +1,6 @@
 import { CalendarDays, MapPin } from 'lucide-react';
 import type { CampusEvent } from '../lib/types';
+import { DemoBadge } from '../components/DemoBadge';
 import { accentFor, INTEREST_LABELS } from '../lib/data';
 import { excerpt, formatPrice, formatShortDay, formatTimeRange, relativeDayLabel } from '../lib/format';
 import { AddToCalendar } from '../components/AddToCalendar';
@@ -164,6 +165,7 @@ function LeadCard({
         </div>
         <h2 className="max-w-3xl font-serif text-2xl leading-tight text-white sm:text-4xl">
           {event.title}
+          <DemoBadge event={event} tone="dark" />
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-navy-100">
           <span className="inline-flex items-center gap-1.5">
@@ -242,6 +244,7 @@ function Card({
         </div>
         <h3 className="font-serif text-[17px] font-semibold leading-snug text-ink group-hover:text-royal">
           {event.title}
+          <DemoBadge event={event} />
         </h3>
         {text && <p className="line-clamp-2 text-xs leading-relaxed text-muted">{text}</p>}
         {event.location && (

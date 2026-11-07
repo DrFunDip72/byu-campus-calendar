@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
 import type { CampusEvent } from '../lib/types';
+import { DemoBadge } from '../components/DemoBadge';
 import { accentFor, INTEREST_LABELS } from '../lib/data';
 import { dayKey, formatMonth, formatPrice, formatTimeRange, relativeDayLabel } from '../lib/format';
 import { AddToCalendar } from '../components/AddToCalendar';
@@ -157,7 +158,13 @@ export function PlannerView({ events, onOpen, saved, onSave }: Props) {
                   {dayEvents.slice(0, 2).map((event) => (
                     <span
                       key={event.id}
-                      className="flex min-w-0 items-center gap-1 rounded px-1 py-px text-[10px] leading-tight text-white"
+                      // A month-grid chip is a 10px truncated pill; a DEMO badge would not fit
+                      // without breaking the grid. A dashed outline plus the tooltip marks the
+                      // stand-ins here, and the day panel below shows the full badge.
+                      title={event.demo ? 'An illustrative stand-in, not a real BYU event' : undefined}
+                      className={`flex min-w-0 items-center gap-1 rounded px-1 py-px text-[10px] leading-tight text-white ${
+                        event.demo ? 'outline-dotted outline-1 outline-offset-[-2px] outline-white/70' : ''
+                      }`}
                       style={{ backgroundColor: `var(--cat-${accentFor(event)})` }}
                     >
                       <span className="truncate">{event.title}</span>
@@ -219,6 +226,7 @@ export function PlannerView({ events, onOpen, saved, onSave }: Props) {
                         </p>
                         <h4 className="text-sm font-semibold leading-snug text-ink group-hover:text-royal">
                           {event.title}
+                          <DemoBadge event={event} />
                         </h4>
                         {event.location && (
                           <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted">

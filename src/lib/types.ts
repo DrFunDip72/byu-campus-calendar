@@ -25,6 +25,16 @@ export interface CampusEvent {
   priceHigh: number;
   /** Source id, or several joined with "+" when sources were merged. */
   source: string;
+  /**
+   * True for illustrative stand-ins, which are badged DEMO everywhere they render.
+   *
+   * These exist because BYU's public feed has no vocabulary for most of what a student actually
+   * wants to follow — there is no club field, no hackathon category, nothing for a specific
+   * student association. Without a handful of stand-ins the headline feature (granular interest
+   * filtering) has almost nothing to filter on, and the demo undersells the idea. Without the
+   * badge, the demo would overstate the data. So: present, and labelled.
+   */
+  demo?: boolean;
 }
 
 export interface InterestGroup {
@@ -37,6 +47,8 @@ export interface InterestGroup {
 export interface EventSnapshot {
   generatedAt: string;
   windowDays: number;
+  /** How many events in this snapshot are illustrative stand-ins rather than real BYU records. */
+  demoCount?: number;
   sources: { id: string; label: string; url: string; count: number }[];
   /** The interest catalog, emitted by the ingest so the UI cannot drift from the classifier. */
   groups: InterestGroup[];
@@ -46,23 +58,43 @@ export interface EventSnapshot {
 }
 
 /**
- * The five surfaces, in two families.
+ * Navigation is two independent axes, not one flat list. See lib/views.ts for why.
  *
- *   BYU surfaces  — what this proposal looks like inside BYU's *existing* products, so the pitch
- *                   conversation can be about the idea rather than about whether it would fit.
- *       web       recreation of calendar.byu.edu
- *       app       recreation of the BYU mobile app's Calendar tab
+ *   PLACEMENT — where this would live
+ *       web         recreation of calendar.byu.edu, their chrome
+ *       app         recreation of the BYU mobile app's Calendar tab, in a phone frame
+ *       standalone  a purpose-built calendar, unconstrained by either
  *
- *   Concepts      — what we would build given a free hand.
- *       feed · discover · planner
+ *   LAYOUT — how events are arranged. Every layout works in every placement.
+ *       list · cards · month
  *
- * `campus` was the original id for `web` and is still accepted from URLs so older links keep
- * working. See VIEW_ALIASES in lib/views.ts.
+ * The retired single-axis ids (`web`, `app`, `feed`, `discover`, `planner`, plus the original
+ * `campus`) are still accepted from URLs and saved preferences and mapped onto a cell of the
+ * matrix. See LEGACY_VIEWS in lib/views.ts.
  */
+export type PlacementId = 'web' | 'app' | 'standalone';
+
+export type LayoutId = 'list' | 'cards' | 'month';
+
+/** The retired flat surface ids. Read-only: accepted as input, never written. */
 export type ViewId = 'web' | 'app' | 'feed' | 'discover' | 'planner';
 
-/** Layouts available *inside* the BYU App surface. Deliberately excludes the website recreation. */
+/**
+ * Layouts available inside the BYU App recreation.
+ *
+ * `day` is the authentic one — today's BYU app genuinely shows a single day at a time, which is
+ * the gap the proposal is built around. It is not offered as a global layout (it would be an
+ * exception that only exists in one placement, which is what we just finished removing) but stays
+ * reachable at `?mode=day` so the before/after can be demonstrated side by side in a pitch.
+ */
 export type AppMode = 'day' | 'feed' | 'discover' | 'month';
+
+/** Maps a global layout onto the BYU App recreation's internal mode. */
+export const APP_MODE_FOR_LAYOUT: Record<LayoutId, AppMode> = {
+  list: 'feed',
+  cards: 'discover',
+  month: 'month'
+};
 
 export type DateRangeId = 'today' | 'weekend' | 'week' | 'month' | 'all';
 

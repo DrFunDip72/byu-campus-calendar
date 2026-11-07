@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, Copy, Download, ExternalLink, Rss, X } from 'lucide-react';
-import type { CampusEvent, Filters, ViewId } from '../lib/types';
+import type { CampusEvent, Filters, LayoutId, PlacementId } from '../lib/types';
 import { INTEREST_LABELS } from '../lib/data';
 import { downloadIcs, subscribeUrl } from '../lib/calendar';
 import { filtersToQuery } from '../lib/prefs';
@@ -10,7 +10,8 @@ interface Props {
   open: boolean;
   onClose: () => void;
   filters: Filters;
-  view: ViewId;
+  placement: PlacementId;
+  layout: LayoutId;
   events: CampusEvent[];
 }
 
@@ -22,17 +23,22 @@ interface Props {
  * appears in the calendar app they already check — no app to open, no notifications to manage.
  * The same URL is what a department would hand out to its own students.
  */
-export function SubscribeDialog({ open, onClose, filters, view, events }: Props) {
+export function SubscribeDialog({ open, onClose, filters, placement, layout, events }: Props) {
   const [copied, setCopied] = useState<'webcal' | 'https' | null>(null);
   if (!open) return null;
 
-  // The feed query deliberately drops the view and the date range: a subscription should track an
-  // interest set forever, not freeze on "next 7 days" or remember which layout was open.
+  // The feed query deliberately drops the surface and the date range: a subscription should track
+  // an interest set forever, not freeze on "next 7 days" or remember which layout was open.
   const feedFilters: Filters = { ...filters, range: 'all' };
   const query = filtersToQuery(feedFilters);
   const webcal = subscribeUrl(query, 'webcal');
   const https = subscribeUrl(query, 'https');
-  const shareUrl = `${window.location.origin}${window.location.pathname}?${filtersToQuery(filters, view)}`;
+  // The share link, by contrast, *does* keep the surface, so "look at this" opens what they saw.
+  const shareUrl = `${window.location.origin}${window.location.pathname}?${filtersToQuery(
+    filters,
+    placement,
+    layout
+  )}`;
 
   const describe = () => {
     if (!filters.myFeedOnly || filters.interests.length === 0) return 'Every event on campus';

@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { Bookmark, BookmarkCheck, MapPin } from 'lucide-react';
 import type { CampusEvent } from '../lib/types';
+import { DemoBadge } from '../components/DemoBadge';
 import { accentFor, INTEREST_LABELS } from '../lib/data';
 import { formatPrice, formatTimeRange, relativeDayLabel } from '../lib/format';
 import { groupByDay } from '../lib/filters';
@@ -105,6 +106,7 @@ function FeedRow({
         <div className="min-w-0 flex-1">
           <h3 className="text-[15px] font-semibold leading-snug text-ink group-hover:text-royal">
             {event.title}
+            <DemoBadge event={event} />
           </h3>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
             {event.location && (

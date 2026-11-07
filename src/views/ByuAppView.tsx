@@ -15,6 +15,7 @@ import {
   CalendarDays as CalendarIcon
 } from 'lucide-react';
 import type { AppMode, CampusEvent } from '../lib/types';
+import { DemoBadge } from '../components/DemoBadge';
 import { accentFor, INTEREST_LABELS } from '../lib/data';
 import { dayKey, formatPrice, formatTimeRange, relativeDayLabel } from '../lib/format';
 import { groupByDay } from '../lib/filters';
@@ -451,6 +452,7 @@ function DiscoverList({
               <p className="text-[11px] font-semibold text-app-sky">{formatTimeRange(event)}</p>
               <h4 className="line-clamp-2 text-[13px] font-semibold leading-snug text-white">
                 {event.title}
+                <DemoBadge event={event} tone="dark" />
               </h4>
               {price && (
                 <p className={`text-[11px] ${price === 'Free' ? 'text-emerald-400' : 'text-white/50'}`}>
@@ -522,10 +524,19 @@ function MonthGrid({
               </span>
               <span className="flex flex-wrap justify-center gap-0.5">
                 {dayEvents.slice(0, 3).map((e) => (
+                  // A dot carries no title to badge, but it still asserts that something is
+                  // happening that day. Stand-ins get a hollow dot so the month grid never
+                  // silently inflates how busy a real day looks.
                   <span
                     key={e.id}
-                    className="h-1 w-1 rounded-full"
-                    style={{ backgroundColor: `var(--cat-${accentFor(e)})` }}
+                    data-demo={e.demo ? 'true' : undefined}
+                    title={e.demo ? 'An illustrative stand-in, not a real BYU event' : undefined}
+                    className={`h-1 w-1 rounded-full ${e.demo ? 'ring-1 ring-white/70' : ''}`}
+                    style={
+                      e.demo
+                        ? { backgroundColor: 'transparent' }
+                        : { backgroundColor: `var(--cat-${accentFor(e)})` }
+                    }
                   />
                 ))}
               </span>
@@ -575,7 +586,10 @@ function AppCard({
         <img src={event.image} alt="" loading="lazy" className="h-14 w-14 shrink-0 rounded object-cover" />
       )}
       <div className="min-w-0 flex-1">
-        <h4 className="text-[15px] font-semibold leading-snug text-white">{event.title}</h4>
+        <h4 className="text-[15px] font-semibold leading-snug text-white">
+          {event.title}
+          <DemoBadge event={event} tone="dark" />
+        </h4>
         {event.orgs.length > 0 && (
           <p className="truncate text-[13px] leading-snug text-white/60">{event.orgs[0]}</p>
         )}
