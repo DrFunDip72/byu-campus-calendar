@@ -8,6 +8,7 @@ import { CompareDialog } from './components/CompareDialog';
 import { EventDetail } from './components/EventDetail';
 import { FeedbackBar, FeedbackLink } from './components/FeedbackBar';
 import { SubscribeDialog } from './components/SubscribeDialog';
+import { WelcomeCard, useWelcomeCard } from './components/WelcomeCard';
 import { SurfaceSwitcher, ViewsSheet } from './components/SurfaceSwitcher';
 import { ActiveFilterBar, InterestPanel } from './components/InterestPanel';
 import { ByuAppView } from './views/ByuAppView';
@@ -69,6 +70,11 @@ export default function App() {
   const [viewsOpen, setViewsOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [feedbackSignal, setFeedbackSignal] = useState(0);
+  const { welcomeOpen, closeWelcome } = useWelcomeCard();
+  const openFeedback = useCallback(() => {
+    closeWelcome();
+    setFeedbackSignal((n) => n + 1);
+  }, [closeWelcome]);
   /** BYU Website placement only: which BYU category the nav has drilled into. */
   const [webCategory, setWebCategory] = useState<string | null>(null);
 
@@ -218,7 +224,18 @@ export default function App() {
           {panel}
         </FilterSheet>
       )}
-      <FeedbackBar placement={placement} layout={layout} openSignal={feedbackSignal} />
+      {/* The arrival card and the floating button are a pair: the card's only job beyond saying
+          what this is, is to hand off to the button, which is why the button is raised above the
+          card's own scrim while it is open. Order matters — the card renders after the button so
+          it wins on equal stacking, and `lifted` is what puts the button back on top. */}
+      <FeedbackBar
+        placement={placement}
+        layout={layout}
+        openSignal={feedbackSignal}
+        lifted={welcomeOpen}
+        onOpen={closeWelcome}
+      />
+      <WelcomeCard open={welcomeOpen} onClose={closeWelcome} onGiveFeedback={openFeedback} />
       {/* No install banner. BYU already ships a mobile app, so "add this to your home screen"
           competes with the thing this proposal is trying to improve rather than supporting it. The
           manifest and offline service worker stay — they cost nothing and make a flaky-signal

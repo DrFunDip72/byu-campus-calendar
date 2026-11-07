@@ -97,7 +97,7 @@ npm run dev      # http://localhost:5173 — also serves /feed.ics
 npm run build:data  # re-pull BYU's calendar, then re-merge the badged stand-ins
 npm run refresh  # just the BYU pull (drops the stand-ins; follow with `npm run seed`)
 npm run seed     # just the stand-ins
-npm run smoke    # server-render all nine combinations and assert behaviour (97 checks)
+npm run smoke    # server-render all nine combinations and assert behaviour (117 checks)
 npm run audit    # report how precise each interest rule is
 npm run build    # typecheck + production build
 bash scripts/make-icons.sh   # regenerate the PWA icon set
@@ -143,7 +143,8 @@ src/views/LayoutRenderer   maps a layout id to its component, used by the app an
 src/components/ByuChrome   recreation of calendar.byu.edu's header, feature bar and footer
 src/components/SurfaceSwitcher  the two-row top bar and the mobile sheet
 src/components/CompareDialog    all three layouts side by side
-src/components/FeedbackBar      the in-page survey
+src/components/WelcomeCard      the arrival card, shown once per browser
+src/components/FeedbackBar      the floating feedback button and the survey it opens
 src/components/DemoBadge        the DEMO marker on stand-in events
 scripts/seed-demo.mjs      merges the badged stand-ins into the snapshot
 src/lib/pwa.ts             service-worker registration (no install prompt — see below)
@@ -199,11 +200,27 @@ to separate.
 **One-time setup:** Vercel dashboard → the project → **Analytics** → **Enable**. Nothing is
 collected until that toggle is on.
 
-### The in-page survey
+### The arrival card and the feedback button
 
-A bar appears after 25 seconds asking *"Would you actually use this?"*, then one follow-up screen:
-preferred layout, whether you are a student, and an optional comment. Dismissing or submitting is
-remembered locally so it never nags.
+Two pieces, in order:
+
+1. **An arrival card**, once per browser. It says this is a student project and not an official BYU
+   site, names the real-vs-stand-in event counts, explains the two axes in one sentence each, and
+   then hands off to the feedback button — which is deliberately raised above the card's own scrim,
+   so the one lit control on a dimmed screen is the one the card is describing. `?welcome=0`
+   suppresses it, and records that, for a live demo or a screenshot run.
+2. **A floating button**, bottom-right, on every placement and every layout. Pressing it opens
+   *"Would you actually use this?"*, then one follow-up screen: preferred layout, whether you are a
+   student, and an optional comment.
+
+Nothing appears on a timer and nothing is suppressed by a stored dismissal. The first version got
+both backwards — a 25-second pop-up plus a text link in the footer — so the feedback route was
+invisible to anyone who looked around briefly and left, and an interruption to anyone who stayed.
+
+The button and the survey are one component with one state machine. They share a corner and must
+never both be on screen, and the arrangement they replace (a timer in the bar, an open-signal
+counter in `App`) is the same two-controls-one-state shape that once desynchronised the layout
+switchers.
 
 Responses go to **Vercel Blob, one small blob per response**. That is deliberate: append-only by
 construction so concurrent submissions cannot overwrite each other, no connection pooling, and

@@ -329,6 +329,65 @@ check('results page compares the key in constant time', resultsApi.includes('sec
 check('results page is noindex', resultsApi.includes('noindex'));
 check('results page escapes comment text', resultsApi.includes('escape(r.comment'));
 
+// The route into the survey has to exist on every screen, not just the one someone happens to be
+// on. The previous build hid it behind a footer link and a 25-second timer, so most visitors never
+// saw it at all — enumerate rather than spot-check, since one missing corner is the whole failure.
+for (const placement of Object.keys(PLACEMENT_MARKERS)) {
+  for (const layout of LAYOUT_IDS) {
+    const html = renderWith(`?placement=${placement}&layout=${layout}`);
+    check(
+      `${placement} + ${layout} shows the feedback button`,
+      html.includes('aria-label="Give feedback"'),
+      'no floating feedback button in this combination'
+    );
+  }
+}
+check(
+  'the day-only app recreation still shows the feedback button',
+  renderWith('?placement=app&mode=day').includes('aria-label="Give feedback"')
+);
+
+const feedbackSource = readFileSync('src/components/FeedbackBar.tsx', 'utf8');
+// Nothing may interrupt. The button waits to be pressed; it does not schedule its own arrival.
+check(
+  'the survey never opens itself on a timer',
+  !feedbackSource.includes('APPEAR_AFTER_MS'),
+  'a timer is scheduling the survey again'
+);
+// A stored dismissal must not be able to disable the button, the way a stored appMode once
+// disabled both layout switchers.
+check(
+  'no stored dismissal can suppress the feedback button',
+  !feedbackSource.includes('localStorage'),
+  'FeedbackBar reads localStorage again, which can silently hide the control'
+);
+
+const welcomeSource = readFileSync('src/components/WelcomeCard.tsx', 'utf8');
+check('the arrival card says it is not official BYU', welcomeSource.includes('not an official BYU site'));
+check('the arrival card points at the feedback button', welcomeSource.includes('bottom-right corner'));
+check('the arrival card explains both axes', welcomeSource.includes('Where it would live'));
+check('the arrival card shows only once per browser', welcomeSource.includes('welcome.v1'));
+check(
+  'the arrival card can be suppressed for a live demo',
+  welcomeSource.includes("get('welcome') === '0'")
+);
+// The URL is rewritten from filter state on every change, so the flag has to be recorded or it is
+// gone from the address bar before the first reload.
+check(
+  'suppressing the arrival card survives a reload',
+  welcomeSource.includes("setItem(STORAGE_KEY, 'suppressed')")
+);
+// On a 375px-wide screen this card's text wraps to nearly twice its laptop height. Inside an
+// overflow-hidden box with no cap, that pushed both buttons past the bottom of the viewport.
+check(
+  'the arrival card scrolls instead of clipping its own buttons',
+  welcomeSource.includes('overflow-y-auto') && welcomeSource.includes('max-h-[calc(100vh-7rem)]')
+);
+check(
+  'the feedback button is raised above the arrival card scrim',
+  feedbackSource.includes('lifted') && appSource.includes('lifted={welcomeOpen}')
+);
+
 console.log('\nSnapshot integrity:');
 check('every event has a parseable start', snapshot.events.every((e) => !Number.isNaN(Date.parse(e.start))));
 check('every event has at least one interest', snapshot.events.every((e) => e.interests.length > 0));

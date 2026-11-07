@@ -763,3 +763,47 @@ Enumerated, not spot-checked, for the same reason as §20: the smoke suite asser
 uses the global names, exposes no `Day` tab by default, marks the current layout for each of the
 three layouts, labels the pinned day-only mode, and that the desktop drawer is suppressed while an
 in-frame panel is supplied.
+
+## 24. An arrival card, and a feedback button that is always there
+
+The feedback survey existed and worked, and almost nobody would have found it. There were exactly
+two routes in: a bar that appeared on a 25-second timer, and a text link in the footer. That is a
+bad pair. The timer interrupts whoever stays long enough to trigger it, and the footer link is
+invisible to everyone else — a student who opens the site from LinkedIn, flips between two layouts
+for forty seconds and closes the tab passes through neither. For a project whose entire purpose is
+to arrive at a BYU meeting holding student opinions, the place where opinions go cannot be the
+hardest thing on the page to find.
+
+It now works the other way round. Nothing appears unasked, and the route in is permanent:
+
+**A floating button, bottom-right, on all nine combinations and on the day-only recreation.** It is
+never suppressed by a stored dismissal, because someone who closed the survey last week may well
+have something to say today. Smoke enumerates all ten surfaces rather than sampling one, for the
+reason given in §20: a control that is missing from one corner of the matrix is the whole failure,
+and spot-checking is precisely what let an unlabelled Cards layout ship.
+
+**An arrival card, once per browser.** Three jobs, in priority order. First, say what this is —
+"not an official BYU site" is the opening line because the BYU Website placement is a faithful
+enough copy that a student could otherwise believe they are filing feedback with the university.
+Second, teach the button. Third, state the two axes in words, once, since that was the thing that
+could not be narrated out loud before the navigation rewrite (§17).
+
+Two details that are load-bearing rather than decorative:
+
+- **The button is lifted above the card's own scrim** (`z-[75]` against the dialog's `z-[70]`) and
+  wears its label while the card is open, lingering a few seconds after it closes. A modal that
+  points at a control its own backdrop has dimmed is teaching nothing. Making the one lit thing on
+  a darkened screen be the thing the sentence refers to is the whole mechanism.
+- **The card caps its height and scrolls its body.** At 512px wide it is 528px tall; at 375px the
+  same text wraps to nearly twice that. Inside an `overflow-hidden` box with no cap, both buttons
+  would have sat below the bottom of a 667px phone viewport, unreachable, on the devices most of
+  this traffic will arrive from.
+
+`?welcome=0` suppresses the card **and records that it did**, because the address bar is rewritten
+from filter state on every change — the flag is gone within a second of load and would not survive
+the first reload of a demo.
+
+The button and the survey are deliberately one component with one state machine. They share a
+corner and must never both be on screen. The arrangement they replace — a timer inside the bar, an
+open-signal counter in `App` — is the same two-controls-one-state shape diagnosed in §23, where the
+header and the in-phone pill row each kept their own idea of the current layout.

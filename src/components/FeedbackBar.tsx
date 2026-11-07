@@ -1,22 +1,33 @@
 import { useEffect, useState } from 'react';
-import { Check, MessageSquare, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { Check, MessageSquare, MessageSquarePlus, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { LAYOUTS } from '../lib/views';
 import { trackFeedback } from '../lib/analytics';
 import type { LayoutId, PlacementId } from '../lib/types';
 
 /**
- * The in-page survey.
+ * The feedback button and the survey it opens.
  *
  * "Tell me what you think" on a social post gets you five comments from people who already like
  * you. Asking inside the product, at the moment someone has just used it, gets a number — and a
  * number is what a pitch needs: "64% of 71 students picked the list layout" is an argument, where
  * "people seemed to like it" is not.
  *
- * Three deliberate constraints:
+ * The first version appeared on a 25-second timer and was otherwise reachable only through a text
+ * link in the footer. That made the feedback route invisible to anyone who looked around briefly
+ * and left, and an interruption to anyone who stayed. It now works the other way round: nothing
+ * appears unasked, and a button is permanently parked in the bottom-right corner of every
+ * placement and every layout. The arrival card introduces it once (see WelcomeCard), so it is a
+ * control students have been shown rather than one they have to notice.
+ *
+ * The button and the panel are deliberately one component with one state machine. They share a
+ * corner and must never both be on screen, and the arrangement they replace — a timer in here, an
+ * open-signal counter in App — is the same two-controls-one-state shape that put the layout
+ * switchers out of sync.
+ *
+ * Two constraints kept from the first version:
  *
  *   - It asks one question first. A form with four fields up front gets abandoned; a single
  *     thumbs-up/down costs nothing and earns the right to ask the rest.
- *   - It never nags. Dismissing or submitting is remembered locally and it does not come back.
  *   - It collects nothing identifying, and says so where the comment box is. Students writing
  *     feedback about their own university should not have to wonder.
  *
@@ -25,22 +36,29 @@ import type { LayoutId, PlacementId } from '../lib/types';
  * be reconstructed from a count. See lib/analytics.ts and api/feedback.ts.
  */
 
-const STORAGE_KEY = 'byu-campus-calendar.feedback.v1';
-
-/** Long enough that the prompt arrives after someone has actually looked at events, not before. */
-const APPEAR_AFTER_MS = 25_000;
+/** How long the button keeps its label after the arrival card hands off to it. */
+const LABEL_MS = 7_000;
 
 type Stage = 'hidden' | 'prompt' | 'form' | 'thanks';
 
 export function FeedbackBar({
   placement,
   layout,
-  openSignal = 0
+  openSignal = 0,
+  lifted = false,
+  onOpen
 }: {
   placement: PlacementId;
   layout: LayoutId;
-  /** Incremented by the footer link, so someone who dismissed the bar can still volunteer later. */
+  /** Incremented by the arrival card and the footer link to open the survey directly. */
   openSignal?: number;
+  /**
+   * Raises the button above the arrival card's scrim and labels it, so the card can point at a
+   * control that is actually lit. Without this the card describes something nobody can see.
+   */
+  lifted?: boolean;
+  /** Fired when the button itself is pressed, so App can dismiss the arrival card first. */
+  onOpen?: () => void;
 }) {
   const [stage, setStage] = useState<Stage>('hidden');
   const [verdict, setVerdict] = useState<'yes' | 'no' | null>(null);
@@ -48,36 +66,23 @@ export function FeedbackBar({
   const [role, setRole] = useState('');
   const [comment, setComment] = useState('');
   const [sending, setSending] = useState(false);
+  const [showLabel, setShowLabel] = useState(false);
 
-  useEffect(() => {
-    let done = false;
-    try {
-      done = localStorage.getItem(STORAGE_KEY) !== null;
-    } catch {
-      /* private browsing: show it, and simply fail to remember the dismissal */
-    }
-    if (done) return;
-    const timer = window.setTimeout(() => setStage('prompt'), APPEAR_AFTER_MS);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  // An explicit request beats both the timer and a remembered dismissal.
+  // An explicit request opens the survey, wherever it came from.
   useEffect(() => {
     if (openSignal > 0) setStage('prompt');
   }, [openSignal]);
 
-  const remember = (value: string) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, value);
-    } catch {
-      /* nothing to do: the bar reappears next visit, which is an acceptable failure */
+  // While the card is up the button is labelled; when the card closes the label lingers briefly so
+  // the eye has somewhere to land, then it settles back to a quiet icon.
+  useEffect(() => {
+    if (lifted) {
+      setShowLabel(true);
+      return;
     }
-  };
-
-  const dismiss = () => {
-    remember('dismissed');
-    setStage('hidden');
-  };
+    const timer = window.setTimeout(() => setShowLabel(false), LABEL_MS);
+    return () => window.clearTimeout(timer);
+  }, [lifted]);
 
   const begin = (value: 'yes' | 'no') => {
     setVerdict(value);
@@ -105,13 +110,39 @@ export function FeedbackBar({
       // A failed write still counts in analytics, and telling a student their opinion was lost
       // would be worse than silently keeping the count.
     }
-    remember('submitted');
     setSending(false);
     setStage('thanks');
     window.setTimeout(() => setStage('hidden'), 4000);
   };
 
-  if (stage === 'hidden') return null;
+  // The resting state: the button, and nothing else. It is never suppressed by a stored dismissal —
+  // someone who closed the survey last week may well have something to say today.
+  if (stage === 'hidden') {
+    // The flex gap is conditional along with the padding: a gap still occupies space next to a
+    // zero-width label, which left the collapsed button 8px wider than it was tall.
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          onOpen?.();
+          setStage('prompt');
+        }}
+        aria-label="Give feedback"
+        className={`group fixed bottom-4 right-4 flex items-center rounded-full bg-navy text-white shadow-lift transition-all hover:bg-navy-600 sm:bottom-6 sm:right-6 ${
+          showLabel ? 'gap-2 px-4 py-3' : 'p-3.5 sm:hover:gap-2'
+        } ${lifted ? 'z-[75] ring-4 ring-white/80' : 'z-40 ring-1 ring-white/30'}`}
+      >
+        <MessageSquarePlus className="h-5 w-5 shrink-0" aria-hidden />
+        <span
+          className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all ${
+            showLabel ? 'max-w-[8rem]' : 'max-w-0 sm:group-hover:max-w-[8rem]'
+          }`}
+        >
+          Feedback
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-3 sm:px-6 sm:pb-5">
@@ -140,8 +171,8 @@ export function FeedbackBar({
               </button>
               <button
                 type="button"
-                onClick={dismiss}
-                aria-label="Dismiss feedback request"
+                onClick={() => setStage('hidden')}
+                aria-label="Close feedback"
                 className="rounded-full p-1.5 text-muted hover:bg-canvas hover:text-ink"
               >
                 <X className="h-4 w-4" aria-hidden />
@@ -158,8 +189,8 @@ export function FeedbackBar({
               </p>
               <button
                 type="button"
-                onClick={dismiss}
-                aria-label="Dismiss feedback request"
+                onClick={() => setStage('hidden')}
+                aria-label="Close feedback"
                 className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-muted hover:bg-canvas hover:text-ink"
               >
                 <X className="h-4 w-4" aria-hidden />
@@ -253,7 +284,7 @@ export function FeedbackBar({
   );
 }
 
-/** Footer entry point, for someone who dismissed the bar and changed their mind. */
+/** Footer entry point. The floating button is the primary route; this is for anyone who reads down. */
 export function FeedbackLink({ onClick }: { onClick: () => void }) {
   return (
     <button
