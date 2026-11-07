@@ -97,7 +97,7 @@ npm run dev      # http://localhost:5173 — also serves /feed.ics
 npm run build:data  # re-pull BYU's calendar, then re-merge the badged stand-ins
 npm run refresh  # just the BYU pull (drops the stand-ins; follow with `npm run seed`)
 npm run seed     # just the stand-ins
-npm run smoke    # server-render all nine combinations and assert behaviour (86 checks)
+npm run smoke    # server-render all nine combinations and assert behaviour (97 checks)
 npm run audit    # report how precise each interest rule is
 npm run build    # typecheck + production build
 bash scripts/make-icons.sh   # regenerate the PWA icon set

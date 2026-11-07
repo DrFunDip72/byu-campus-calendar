@@ -67,7 +67,12 @@ function readStorage(): StoredPrefs {
         ? parsed.placement
         : (legacy?.placement ?? DEFAULTS.placement),
       layout: isLayout(parsed.layout) ? parsed.layout : (legacy?.layout ?? DEFAULTS.layout),
-      appMode: APP_MODES.includes(parsed.appMode as AppMode) ? (parsed.appMode as AppMode) : null,
+      // Deliberately NOT restored. `appMode` is a pitch escape hatch for showing today's day-only
+      // BYU app, not a preference — and while it is set it overrides the layout axis entirely.
+      // The previous build defaulted it to 'day' and persisted it, so anyone who used the app
+      // surface before the rewrite came back with day mode pinned and both layout switchers dead.
+      // It now comes from the URL or not at all.
+      appMode: null,
       saved: Array.isArray(parsed.saved)
         ? (parsed.saved as unknown[]).filter((x): x is string => typeof x === 'string')
         : []

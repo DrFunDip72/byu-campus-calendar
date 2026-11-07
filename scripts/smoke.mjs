@@ -126,6 +126,54 @@ check(
 
 const appHtml = renderWith('?placement=app');
 check('app placement renders its bottom tab bar', appHtml.includes('Home') && appHtml.includes('Search'));
+
+// The in-app pill row and the header row are two handles on one piece of state. They were briefly
+// two controls over two vocabularies — the header said "List" while the pill said "Feed" — which
+// made the header look broken, and the fourth "Day" pill mapped to no global layout so clicking it
+// did nothing at all. Both regressions are cheap to reintroduce and invisible without these.
+const appLayoutNav = appHtml.slice(appHtml.indexOf('aria-label="Calendar layout"'));
+const appNavSlice = appLayoutNav.slice(0, appLayoutNav.indexOf('</nav>'));
+check(
+  'app layout pills use the global layout names',
+  ['List', 'Cards', 'Month'].every((l) => appNavSlice.includes(l)),
+  appNavSlice.slice(0, 200)
+);
+check(
+  'app layout pills expose no dead Day tab by default',
+  !appNavSlice.includes('Day'),
+  'a Day pill rendered without ?mode=day, and it maps to no global layout'
+);
+for (const layout of ['list', 'cards', 'month']) {
+  const html = renderWith(`?placement=app&layout=${layout}`);
+  const nav = html.slice(html.indexOf('aria-label="Calendar layout"'));
+  check(
+    `app layout ${layout} marks itself current in the in-app pills`,
+    nav.slice(0, nav.indexOf('</nav>')).includes('aria-current="true"'),
+    'the header changed layout but the phone pills did not follow'
+  );
+}
+const dayHtml = renderWith('?placement=app&mode=day');
+const dayNav = dayHtml.slice(dayHtml.indexOf('aria-label="Calendar layout"'));
+check(
+  'the day-only original is labelled when pinned',
+  dayNav.slice(0, dayNav.indexOf('</nav>')).includes('today'),
+  '?mode=day did not announce itself as today’s app'
+);
+
+// Filters belong inside the phone, not in a browser-edge drawer beside a phone mock.
+const appSource = readFileSync('src/App.tsx', 'utf8');
+check(
+  'the desktop filter drawer is suppressed on the app placement',
+  appSource.includes("placement !== 'app'")
+);
+check(
+  'the app placement receives an in-frame filter panel',
+  appSource.includes('filterPanel={panel}')
+);
+check(
+  'the phone frame renders filters inside itself',
+  readFileSync('src/views/ByuAppView.tsx', 'utf8').includes('absolute inset-0 z-20')
+);
 // The day-only original stays reachable for a before/after comparison in a pitch.
 check(
   'app placement honours the ?mode=day escape hatch',

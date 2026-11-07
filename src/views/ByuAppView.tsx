@@ -5,16 +5,17 @@ import {
   ChevronRight,
   Filter,
   Home,
-  LayoutGrid,
-  List,
   type LucideIcon,
   MapPin,
   Menu,
   Rows3,
   Search,
+  X,
   CalendarDays as CalendarIcon
 } from 'lucide-react';
-import type { AppMode, CampusEvent } from '../lib/types';
+import type { AppMode, CampusEvent, LayoutId } from '../lib/types';
+import { APP_MODE_FOR_LAYOUT } from '../lib/types';
+import { LAYOUTS } from '../lib/views';
 import { DemoBadge } from '../components/DemoBadge';
 import { accentFor, INTEREST_LABELS } from '../lib/data';
 import { dayKey, formatPrice, formatTimeRange, relativeDayLabel } from '../lib/format';
@@ -27,8 +28,20 @@ interface Props {
   saved: string[];
   onSave: (id: string) => void;
   mode: AppMode;
-  onModeChange: (mode: AppMode) => void;
+  /**
+   * Selecting a layout here sets the *same* global layout the header switcher sets.
+   *
+   * These were briefly two different controls over two different vocabularies — the header said
+   * "List" while the pill below said "Feed" — so the header looked broken even though it worked.
+   * One state, one set of names, two places to reach it.
+   */
+  onSelectLayout: (layout: LayoutId) => void;
   onOpenFilters: () => void;
+  /** Filters render *inside* the phone frame, not as a desktop side sheet. See App.tsx. */
+  filtersOpen: boolean;
+  onCloseFilters: () => void;
+  filterPanel: React.ReactNode;
+  resultCount: number;
   query: string;
   onQueryChange: (q: string) => void;
   activeFilterCount: number;
@@ -67,8 +80,12 @@ export function ByuAppView({
   saved,
   onSave,
   mode,
-  onModeChange,
+  onSelectLayout,
   onOpenFilters,
+  filtersOpen,
+  onCloseFilters,
+  filterPanel,
+  resultCount,
   query,
   onQueryChange,
   activeFilterCount
@@ -105,8 +122,11 @@ export function ByuAppView({
   const selectedDate = parseKey(selectedDay);
   const dayEvents = byDay.get(selectedDay) ?? [];
 
+  /** Today's day-only app, reachable only via `?mode=day`. Not one of the three global layouts. */
+  const isDayMode = mode === 'day';
+
   return (
-    <div className="mx-auto w-full max-w-[420px] overflow-hidden bg-app-bg text-white sm:rounded-[2rem] sm:border-[10px] sm:border-black sm:shadow-lift">
+    <div className="relative mx-auto w-full max-w-[420px] overflow-hidden bg-app-bg text-white sm:rounded-[2rem] sm:border-[10px] sm:border-black sm:shadow-lift">
       <div className="flex h-[720px] flex-col sm:h-[780px]">
         {/* Header */}
         <header className="flex shrink-0 items-center justify-between bg-app-bg px-4 py-3">
@@ -129,23 +149,37 @@ export function ByuAppView({
           </button>
         </header>
 
-        {/* Layout switcher — the main addition to the real app's Calendar tab. */}
+        {/* Layout switcher — the main addition to the real app's Calendar tab.
+
+            It renders the three global layouts under their global names, so this and the header
+            row are two handles on one piece of state rather than two competing controls. There is
+            deliberately no standalone "Day" pill: day-only is what today's app already does, not
+            something the proposal offers, and as a fourth tab it was simply dead — it mapped to no
+            global layout, so clicking it did nothing at all. */}
         <nav aria-label="Calendar layout" className="flex shrink-0 gap-1 bg-app-bg px-3 pb-2.5">
-          {MODES.map((m) => {
-            const Icon = m.icon;
-            const on = mode === m.id;
+          {isDayMode && (
+            // Only reachable via ?mode=day. Shown as an active, self-describing pill so a pitch
+            // demo makes it obvious you are looking at today's app rather than the proposal.
+            <span className="flex flex-1 items-center justify-center gap-1 rounded-full bg-amber-300 py-1.5 text-[11px] font-semibold text-amber-950">
+              <Rows3 className="h-3.5 w-3.5" aria-hidden />
+              Day (today&rsquo;s app)
+            </span>
+          )}
+          {LAYOUTS.map((definition) => {
+            const Icon = definition.icon;
+            const on = !isDayMode && mode === APP_MODE_FOR_LAYOUT[definition.id];
             return (
               <button
-                key={m.id}
+                key={definition.id}
                 type="button"
-                onClick={() => onModeChange(m.id)}
+                onClick={() => onSelectLayout(definition.id)}
                 aria-current={on}
                 className={`flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 text-[11px] font-semibold transition-colors ${
                   on ? 'bg-white text-app-bg' : 'bg-white/10 text-white/70 hover:bg-white/15'
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" aria-hidden />
-                {m.label}
+                {definition.label}
               </button>
             );
           })}
@@ -199,15 +233,28 @@ export function ByuAppView({
           ) : mode === 'discover' ? (
             <DiscoverList events={events} onOpen={onOpen} savedSet={savedSet} onSave={onSave} />
           ) : (
-            <MonthGrid
-              cursor={cursor}
-              byDay={byDay}
-              selected={selectedDay}
-              onSelect={(key) => {
-                setSelectedDay(key);
-                onModeChange('day');
-              }}
-            />
+            <>
+              <MonthGrid
+                cursor={cursor}
+                byDay={byDay}
+                selected={selectedDay}
+                // Tapping a day opens it in a panel underneath rather than switching modes. The
+                // old behaviour jumped to the `day` layout, which no longer exists as a global
+                // choice — so the tap silently did nothing.
+                onSelect={setSelectedDay}
+              />
+              {dayEvents.length > 0 && (
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <DayList
+                    date={selectedDate}
+                    events={dayEvents}
+                    onOpen={onOpen}
+                    savedSet={savedSet}
+                    onSave={onSave}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -219,6 +266,47 @@ export function ByuAppView({
           <TabItem icon={Search} label="Search" />
         </nav>
       </div>
+
+      {/* Filters, as a sheet *inside* the phone.
+
+          The shared desktop filter drawer slid in from the right edge of the browser window,
+          which on this surface is nonsense: it showed a laptop sidebar next to a phone someone is
+          being asked to evaluate as a phone. Scoping it to the frame (the wrapper above is
+          `relative`, this is `absolute inset-0`) makes the funnel button behave the way it would
+          on the device, which is the whole point of rendering a device at all. */}
+      {filtersOpen && (
+        <div className="absolute inset-0 z-20 flex flex-col justify-end sm:rounded-[1.4rem]">
+          <button
+            type="button"
+            aria-label="Close filters"
+            onClick={onCloseFilters}
+            className="absolute inset-0 bg-black/60"
+          />
+          <div className="relative flex max-h-[88%] flex-col rounded-t-2xl bg-white text-ink">
+            <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
+              <h2 className="font-serif text-base text-ink">My interests</h2>
+              <button
+                type="button"
+                onClick={onCloseFilters}
+                aria-label="Close filters"
+                className="-mr-1 rounded-full p-1.5 text-muted hover:bg-canvas hover:text-ink"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">{filterPanel}</div>
+            <div className="shrink-0 border-t border-line p-2.5">
+              <button
+                type="button"
+                onClick={onCloseFilters}
+                className="w-full rounded-lg bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-600"
+              >
+                Show {resultCount} {resultCount === 1 ? 'event' : 'events'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -232,12 +320,6 @@ export function ByuAppView({
   }
 }
 
-const MODES: { id: AppMode; label: string; icon: LucideIcon }[] = [
-  { id: 'day', label: 'Day', icon: Rows3 },
-  { id: 'feed', label: 'Feed', icon: List },
-  { id: 'discover', label: 'Discover', icon: LayoutGrid },
-  { id: 'month', label: 'Month', icon: CalendarIcon }
-];
 
 /** The green month header. #076940 was sampled from the recording. */
 function MonthBar({ cursor, onPrev, onNext }: { cursor: Date; onPrev: () => void; onNext: () => void }) {

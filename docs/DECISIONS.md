@@ -701,3 +701,65 @@ about the project, where it would have muddied the ask.
 What the service worker still earns: campus wifi is unreliable, and a cached shell means the
 calendar opens in a building with bad signal. `/feed.ics` is never cached, because a stale
 subscription silently stops updating. The smoke suite asserts that no install prompt creeps back.
+
+---
+
+## 23. Two bugs in the BYU App placement, and what caused them
+
+Both were reported from the live site after §18 shipped, and both came from the same root: the
+app recreation kept speaking its own private vocabulary after navigation became global.
+
+### The header layout switcher looked broken
+
+It was not broken — it changed state correctly. But the phone's own pill row rendered the *old*
+names (`Day · Feed · Discover · Month`) while the header rendered the new ones
+(`List · Cards · Month`). Pressing **List** in the header lit up **Feed** in the phone, so the two
+controls visibly contradicted each other and the reasonable conclusion was that the header did
+nothing.
+
+Worse, the `Day` pill was genuinely dead. It mapped to no global layout, so `onModeChange('day')`
+found no match and returned without changing anything. The same dead path fired when tapping a day
+in the month grid, which also tried to switch to `day`.
+
+**Fix.** The pill row is now generated from the same `LAYOUTS` registry the header uses, so the two
+cannot drift — there is no second list of names to forget to update. Tapping a day in the month
+grid opens a day panel *underneath the grid* instead of switching modes, which both removes the
+dead path and is better behaviour anyway.
+
+`day` is not a fourth global layout — it would exist in exactly one placement, which is the
+exception §18 was written to eliminate. It stays reachable at `?mode=day` and renders as a
+distinct amber **Day (today's app)** pill, so a pitch demo makes it obvious you are looking at what
+BYU ships today rather than at the proposal.
+
+**The part worth remembering.** `appMode` overrides the layout axis entirely while it is set, and
+the *previous* build defaulted it to `'day'` and persisted it to localStorage. So anyone who used
+the app surface before the rewrite came back with day mode silently pinned and both layout
+switchers inert, with nothing in the UI explaining why. Two changes: `appMode` is no longer
+restored from storage (it is a pitch escape hatch, not a preference), and `changeLayout` clears it
+centrally — at the reducer rather than at one call site, so the header, the mobile sheet and
+Compare cannot diverge.
+
+A stale persisted value that disables a control is close to invisible in testing, because the
+developer's own storage usually holds the new shape. It is worth asking, on any schema change to
+saved preferences, what an *old* stored value now means.
+
+### Filters opened a desktop drawer next to the phone
+
+The shared filter sheet is `fixed inset-0` and slides in from the right edge of the browser
+window. On the two web placements that is correct. On the phone placement it meant clicking the
+funnel — a control drawn inside a phone someone is being asked to evaluate *as a phone* — threw a
+laptop sidebar across the screen next to it. The interaction being demonstrated was not the
+interaction being proposed, which defeats the point of rendering a device frame at all.
+
+**Fix.** The phone frame is now `relative`, and on this placement filters render as an
+`absolute inset-0` bottom sheet scoped to the frame: scrim, grabbable white sheet, a
+*Show N events* button. The desktop drawer is suppressed for `placement === 'app'`. Both entry
+points — the in-phone funnel and the header's *My interests* — open the same in-frame sheet, so
+the scaffolding never contradicts the device.
+
+### Regression cover
+
+Enumerated, not spot-checked, for the same reason as §20: the smoke suite asserts the pill row
+uses the global names, exposes no `Day` tab by default, marks the current layout for each of the
+three layouts, labels the pinned day-only mode, and that the desktop drawer is suppressed while an
+in-frame panel is supplied.

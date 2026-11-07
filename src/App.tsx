@@ -28,6 +28,7 @@ export default function App() {
     layout,
     setLayout,
     appMode,
+    setAppMode,
     filters,
     patch,
     toggleInterest,
@@ -52,9 +53,13 @@ export default function App() {
   const changeLayout = useCallback(
     (next: LayoutId, via: 'switcher' | 'sheet' | 'compare' = 'switcher') => {
       setLayout(next);
+      // Pinned day mode overrides the layout entirely on the BYU App placement. Clearing it here
+      // rather than at one call site means the header, the mobile sheet and Compare all behave
+      // the same; previously a `?mode=day` link left every one of them looking broken.
+      setAppMode(null);
       trackLayoutChange(next, placement, via);
     },
-    [setLayout, placement]
+    [setLayout, setAppMode, placement]
   );
 
   const [detail, setDetail] = useState<CampusEvent | null>(null);
@@ -205,7 +210,10 @@ export default function App() {
         onVote={(next) => trackLayoutChange(next, placement, 'compare')}
         onClose={() => setCompareOpen(false)}
       />
-      {filtersOpen && (
+      {/* The BYU App placement renders filters inside the phone frame instead — a drawer sliding
+          out of the browser's right edge next to a phone mock is not the interaction being
+          proposed. See ByuAppView. */}
+      {filtersOpen && placement !== 'app' && (
         <FilterSheet onClose={() => setFiltersOpen(false)} count={events.length}>
           {panel}
         </FilterSheet>
@@ -301,13 +309,12 @@ export default function App() {
             // `appMode` is only ever set by the `?mode=day` pitch escape hatch; normally the global
             // layout drives the app's internal mode so the two axes stay honest.
             mode={appMode ?? APP_MODE_FOR_LAYOUT[layout]}
-            onModeChange={(next) => {
-              const match = (Object.entries(APP_MODE_FOR_LAYOUT) as [LayoutId, string][]).find(
-                ([, mode]) => mode === next
-              );
-              if (match) changeLayout(match[0], 'switcher');
-            }}
+            onSelectLayout={(next) => changeLayout(next, 'switcher')}
             onOpenFilters={() => setFiltersOpen(true)}
+            filtersOpen={filtersOpen}
+            onCloseFilters={() => setFiltersOpen(false)}
+            filterPanel={panel}
+            resultCount={events.length}
             query={filters.query}
             onQueryChange={(query) => patch({ query })}
             activeFilterCount={activeFilterCount}
