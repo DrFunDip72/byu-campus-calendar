@@ -40,6 +40,8 @@ interface FeedEvent {
   url: string | null;
   ticketsUrl: string | null;
   free: boolean;
+  /** True for illustrative stand-ins. See scripts/seed-demo.mjs. */
+  demo?: boolean;
 }
 
 /**
@@ -132,6 +134,12 @@ function matchesQuery(event: FeedEvent, query: string): boolean {
 
 function details(event: FeedEvent): string {
   const parts: string[] = [];
+  if (event.demo) {
+    parts.push(
+      'DEMO EVENT — this is an illustrative stand-in, not a real BYU event. It exists because ' +
+        "BYU's public calendar feed has no category for club events. Do not plan around it."
+    );
+  }
   if (event.summary) parts.push(event.summary);
   else if (event.description) parts.push(event.description.slice(0, 600));
   if (event.orgs.length) parts.push(`Hosted by: ${event.orgs.join(', ')}`);
@@ -152,7 +160,10 @@ function toVevent(event: FeedEvent): string[] {
     event.allDay
       ? `DTEND;VALUE=DATE:${dayStamp(new Date(start.getTime() + 86_400_000))}`
       : `DTEND:${utcStamp(end)}`,
-    `SUMMARY:${escapeText(event.title)}`,
+    // Stand-ins are prefixed here, not just badged in the UI. Once an event is sitting in
+    // someone's Google Calendar there is no badge, no banner and no About panel — the title is
+    // the only thing carrying the disclosure, so it has to carry it.
+    `SUMMARY:${escapeText(event.demo ? `[DEMO] ${event.title}` : event.title)}`,
     `DESCRIPTION:${escapeText(details(event))}`,
     `CATEGORIES:${escapeText(event.category)}`
   ];

@@ -261,6 +261,10 @@ for (const placement of ['web', 'app', 'standalone']) {
 }
 const demoHtml = renderWith('?layout=list&interests=club-pma');
 check('the honesty banner names the real count', demoHtml.includes('real BYU events'));
+// The exported calendar is the one place a badge cannot follow the event, so the title must.
+const feedSource = readFileSync('api/feed.ts', 'utf8');
+check('the ICS feed prefixes stand-in titles', feedSource.includes('[DEMO] ${event.title}'));
+check('the ICS feed explains stand-ins in the description', feedSource.includes('DEMO EVENT'));
 check(
   'the About panel discloses the stand-ins',
   readFileSync('src/components/AboutDialog.tsx', 'utf8').includes('illustrative')
