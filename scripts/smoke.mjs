@@ -309,6 +309,20 @@ for (const placement of ['web', 'app', 'standalone']) {
 }
 const demoHtml = renderWith('?layout=list&interests=club-pma');
 check('the honesty banner names the real count', demoHtml.includes('real BYU events'));
+// It costs two lines above the fold on every page, so it has to be closable.
+check(
+  'the honesty banner can be dismissed',
+  demoHtml.includes('aria-label="Dismiss the stand-in data notice"')
+);
+const bannerSource = readFileSync('src/components/DemoBanner.tsx', 'utf8');
+check('dismissing the honesty banner sticks', bannerSource.includes('demo-banner.v1'));
+// Dismissing the summary must not dismiss the disclosure: the per-event labelling is what makes
+// a stand-in identifiable, and that is asserted separately across all nine combinations above.
+check(
+  'the banner is not the only place stand-ins are labelled',
+  demoEvents.length > 0 && demoHtml.includes('DEMO'),
+  'nothing marks a stand-in once the banner is gone'
+);
 // The exported calendar is the one place a badge cannot follow the event, so the title must.
 const feedSource = readFileSync('api/feed.ts', 'utf8');
 check('the ICS feed prefixes stand-in titles', feedSource.includes('[DEMO] ${event.title}'));

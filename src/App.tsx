@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
-import { CalendarX2, Info, Plus, SlidersHorizontal, X } from 'lucide-react';
+import { CalendarX2, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { AppHeader } from './components/AppHeader';
 import { AboutDialog } from './components/AboutDialog';
 import { ByuFeatureBar, ByuFooter, ByuHeader } from './components/ByuChrome';
 import { CompareDialog } from './components/CompareDialog';
+import { DemoBanner } from './components/DemoBanner';
 import { EventDetail } from './components/EventDetail';
 import { FeedbackBar, FeedbackLink } from './components/FeedbackBar';
 import { SubscribeDialog } from './components/SubscribeDialog';
@@ -15,7 +16,7 @@ import { ByuAppView } from './views/ByuAppView';
 import { CampusView } from './views/CampusView';
 import { LayoutRenderer } from './views/LayoutRenderer';
 import { applyFilters } from './lib/filters';
-import { DATA, DEMO_COUNT, EVENTS, INTEREST_LABELS, REAL_COUNT } from './lib/data';
+import { DATA, EVENTS, INTEREST_LABELS } from './lib/data';
 import { usePreferences } from './lib/prefs';
 import { layoutById, placementById } from './lib/views';
 import { trackCompareOpen, trackLayoutChange, trackPlacementChange } from './lib/analytics';
@@ -107,33 +108,9 @@ export default function App() {
     />
   );
 
-  /**
-   * The honesty banner.
-   *
-   * Shown on every placement rather than tucked inside the About panel, because the stand-in
-   * events are visible on the first screen and a label that has to be hunted for is not a label.
-   * It also doubles as the pitch: the reason stand-ins are needed at all *is* the finding.
-   */
-  const demoBanner = DEMO_COUNT > 0 && (
-    <div className="border-b border-amber-200 bg-amber-50">
-      <p className="mx-auto flex max-w-[1200px] items-start gap-2 px-4 py-2 text-[11px] leading-snug text-amber-900 sm:px-6 sm:text-xs">
-        <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-        <span>
-          <span className="font-semibold">{REAL_COUNT} real BYU events</span> pulled from the public
-          calendar API, plus <span className="font-semibold">{DEMO_COUNT} stand-ins marked DEMO</span>{' '}
-          — because that feed has no category for clubs, hackathons or any specific student
-          association.{' '}
-          <button
-            type="button"
-            onClick={() => setAboutOpen(true)}
-            className="font-semibold underline hover:no-underline"
-          >
-            Why that matters
-          </button>
-        </span>
-      </p>
-    </div>
-  );
+  // Dismissable, and it owns that state itself. See DemoBanner for why losing the strip does not
+  // lose the disclosure.
+  const demoBanner = <DemoBanner onExplain={() => setAboutOpen(true)} />;
 
   const emptyNotice = emptyInterests.length > 0 && (
     <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">

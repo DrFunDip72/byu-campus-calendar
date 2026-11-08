@@ -625,7 +625,13 @@ audience to mislead.
 - Compact surfaces that cannot fit a badge get an equivalent: a dotted outline on month-grid chips,
   a hollow dot in the BYU app's month grid — because a filled dot still asserts that *something* is
   happening that day, and the grid must not silently inflate how busy a real day looks.
-- A persistent amber banner on every surface naming the real count and the stand-in count.
+- An amber banner on every surface naming the real count and the stand-in count. It is
+  **dismissable, and the dismissal sticks** — it costs two lines above the fold on every page,
+  and a reader who has absorbed it once should be able to reclaim the space. That is only safe
+  because the banner is the *summary* of the disclosure and never the disclosure itself: every
+  item above this one survives it. Nothing about whether a given event is real depends on the
+  strip being on screen. The smoke suite asserts both halves — that the banner carries a
+  dismiss control, and that stand-ins are still labelled without it.
 - A dedicated section in the About panel explaining why they exist.
 - Excluded from the headline figure everywhere. The number quoted publicly is **476 real events**.
 
