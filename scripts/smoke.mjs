@@ -361,6 +361,40 @@ check(
   !feedbackSource.includes('localStorage'),
   'FeedbackBar reads localStorage again, which can silently hide the control'
 );
+// The button vanished once because the component returned the button *or* the survey depending on
+// its stage. It must now render in every stage, including while the survey is open.
+// Specifically the render-gate shape — a stage test that returns markup or nothing. An early
+// `return;` inside an effect is fine and is what a looser pattern kept flagging.
+check(
+  'the feedback button is never gated on a survey stage',
+  !/if \(stage [^\n]*\)\s*\{?\s*\n?\s*return (\(|null)/.test(feedbackSource),
+  'the button is behind a stage check again, so some state will hide it'
+);
+check(
+  'the feedback button survives its own pop-up being open',
+  (() => {
+    const button = feedbackSource.indexOf('aria-label="Give feedback"');
+    const popup = feedbackSource.indexOf("{stage !== 'closed' &&");
+    return button > 0 && popup > button;
+  })(),
+  'the button no longer renders ahead of, and outside, the pop-up conditional'
+);
+// A bar pinned to the bottom edge of a tall page is not a response to a click in the corner.
+check(
+  'the survey is a centred pop-up, not a bottom bar',
+  feedbackSource.includes('items-center justify-center') &&
+    !feedbackSource.includes('fixed inset-x-0 bottom-0'),
+  'the bottom-edge survey bar is back'
+);
+check('the survey pop-up is a modal dialog', feedbackSource.includes('aria-modal="true"'));
+check(
+  'the survey cannot be sent without a verdict',
+  feedbackSource.includes('disabled={sending || !verdict}')
+);
+check(
+  'reopening the survey starts from a blank form',
+  feedbackSource.includes('const openForm')
+);
 
 const welcomeSource = readFileSync('src/components/WelcomeCard.tsx', 'utf8');
 check('the arrival card says it is not official BYU', welcomeSource.includes('not an official BYU site'));

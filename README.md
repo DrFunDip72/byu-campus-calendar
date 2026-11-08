@@ -97,7 +97,7 @@ npm run dev      # http://localhost:5173 — also serves /feed.ics
 npm run build:data  # re-pull BYU's calendar, then re-merge the badged stand-ins
 npm run refresh  # just the BYU pull (drops the stand-ins; follow with `npm run seed`)
 npm run seed     # just the stand-ins
-npm run smoke    # server-render all nine combinations and assert behaviour (117 checks)
+npm run smoke    # server-render all nine combinations and assert behaviour (123 checks)
 npm run audit    # report how precise each interest rule is
 npm run build    # typecheck + production build
 bash scripts/make-icons.sh   # regenerate the PWA icon set
@@ -209,18 +209,25 @@ Two pieces, in order:
    then hands off to the feedback button — which is deliberately raised above the card's own scrim,
    so the one lit control on a dimmed screen is the one the card is describing. `?welcome=0`
    suppresses it, and records that, for a live demo or a screenshot run.
-2. **A floating button**, bottom-right, on every placement and every layout. Pressing it opens
-   *"Would you actually use this?"*, then one follow-up screen: preferred layout, whether you are a
-   student, and an optional comment.
+2. **A floating button**, bottom-right, rendered **unconditionally** — every placement, every
+   layout, and every stage of the survey, including while the survey is open. Pressing it opens a
+   **centred pop-up** asking all of it on one screen: would you use this (the only required
+   answer), preferred layout, whether you are a student, and an optional comment.
 
-Nothing appears on a timer and nothing is suppressed by a stored dismissal. The first version got
-both backwards — a 25-second pop-up plus a text link in the footer — so the feedback route was
-invisible to anyone who looked around briefly and left, and an interruption to anyone who stayed.
+Two invariants, both learned the hard way:
 
-The button and the survey are one component with one state machine. They share a corner and must
-never both be on screen, and the arrangement they replace (a timer in the bar, an open-signal
-counter in `App`) is the same two-controls-one-state shape that once desynchronised the layout
-switchers.
+**The button is never conditionally rendered.** An earlier version returned *either* the button or
+the survey depending on its stage, which made it vanish on press. It is raised above the arrival
+card's scrim so the card can point at it — which also makes it the one clickable thing over a
+dimmed screen, so pressing it reads as "clicking out of the card". The reward for that was the
+button disappearing. `npm run smoke` guards the shape, not just the output: it fails if a stage test
+returns markup, and if the button stops being emitted ahead of the pop-up conditional.
+
+**The survey is a pop-up, not a bottom bar.** It appears where attention already is, as a direct
+consequence of the press. A bar pinned to the bottom edge of a tall page is not a response to a
+click in the corner; it is a separate event happening somewhere else.
+
+Nothing appears on a timer and nothing is suppressed by a stored dismissal.
 
 Responses go to **Vercel Blob, one small blob per response**. That is deliberate: append-only by
 construction so concurrent submissions cannot overwrite each other, no connection pooling, and

@@ -803,7 +803,50 @@ Two details that are load-bearing rather than decorative:
 from filter state on every change — the flag is gone within a second of load and would not survive
 the first reload of a demo.
 
-The button and the survey are deliberately one component with one state machine. They share a
-corner and must never both be on screen. The arrangement they replace — a timer inside the bar, an
-open-signal counter in `App` — is the same two-controls-one-state shape diagnosed in §23, where the
-header and the in-phone pill row each kept their own idea of the current layout.
+The button and the survey are deliberately one component with one state machine. The arrangement
+they replace — a timer inside the bar, an open-signal counter in `App` — is the same
+two-controls-one-state shape diagnosed in §23, where the header and the in-phone pill row each kept
+their own idea of the current layout.
+
+The first cut of this had the button and the survey *alternate* within that state machine, which
+turned out to be the bug in §25.
+
+## 25. The button that disappeared when you pressed it
+
+Reported from the live site: "I clicked out of the card, and then the feedback button in the bottom
+right disappeared."
+
+Three decisions from §24 were each defensible and combined into something indefensible.
+
+1. The button is **raised above the arrival card's scrim** so the card has something lit to point
+   at. Correct on its own — and it makes the button the only clickable thing on a dimmed screen.
+2. Pressing the button **opened the survey**, which also dismissed the card. Correct on its own.
+3. The component rendered **either** the button **or** the survey, depending on stage. Correct on
+   its own: they shared a corner, so they could not both be there.
+
+Put together: the only lit control over a dimmed page is the one you press to dismiss the card — and
+pressing it removed that control and opened a bar at the bottom edge of a tall page, far from where
+the click happened. From the outside this is not a survey opening. It is a button evaporating.
+
+The survey being a bottom bar made it worse. The bar was a holdover from when it arrived uninvited
+on a timer, where living at the edge of the screen was the polite choice. The moment it became a
+response to a deliberate press, the edge became the wrong place: a click in the bottom-right corner
+should be answered where the eye already is, not somewhere else on the page.
+
+Two rules now, and the smoke suite guards the **shape of the code**, not only its output, because
+both failures were structural rather than visual:
+
+- **The button is unconditional.** It renders in every stage, including while the survey is open;
+  the pop-up simply covers it with its own scrim. A check fails if any stage test returns markup or
+  `null`, and another fails if the button stops being emitted ahead of the pop-up conditional. A
+  control that is permanent is learned once; one that comes and goes is rediscovered every time.
+- **The survey is a centred modal.** A check fails if `fixed inset-x-0 bottom-0` reappears.
+
+Everything is now asked on one screen, with the verdict as the only required field — `Send` stays
+disabled until Yes or No is chosen, since the verdict is the number the pitch turns on. Reopening
+resets the form, because showing someone their previous answers still filled in reads as though
+nothing sent.
+
+The general lesson, and the third time this project has hit it: **two controls for one piece of
+state will drift** (§23), and **one control that is sometimes absent is worse than either**. When a
+single element is the whole route into a feature, nothing about its presence should be computed.
