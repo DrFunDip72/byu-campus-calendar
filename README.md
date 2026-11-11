@@ -125,7 +125,9 @@ cs.byu.edu  ──────────────────────�
 
 The snapshot is **committed and shipped**, not fetched at runtime: `calendar.byu.edu` is behind
 CloudFront, which 403s some datacenter IPs, so a serverless fetch isn't dependably available. A
-GitHub Action re-pulls daily, runs the smoke test and build, and commits only if something changed.
+scheduled task on a home machine re-pulls every other day, gates the result with the smoke test and
+build, and commits only if both pass. It is not a GitHub Action: CloudFront 403s the runner ranges
+too, which took three weeks to notice. See `scripts/refresh-snapshot.ps1` and DECISIONS §26.
 
 ## Layout
 

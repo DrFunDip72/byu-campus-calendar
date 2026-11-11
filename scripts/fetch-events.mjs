@@ -8,7 +8,10 @@
 //      requests. That is a fine build step and a terrible page load.
 //   3. The feed is public, identical for every student, and changes a few times a day at most.
 //
-// Refreshed daily by .github/workflows/refresh-events.yml, which commits the result.
+// Refreshed every other day by scripts/refresh-snapshot.ps1, run from a Windows scheduled task on
+// a home machine. It cannot run on GitHub Actions: CloudFront 403s every window from the runner
+// ranges, and this script skips what it cannot read, so a run there writes a gutted snapshot
+// without failing. See docs/DECISIONS.md §26.
 //
 // Usage: node scripts/fetch-events.mjs [--days 270]
 

@@ -72,7 +72,8 @@ more engineering and not a new content programme.
 ## 3. A build-time snapshot, not a runtime fetch
 
 **Decision:** the ingest runs as a script, writes `src/data/events.json`, and that file is committed
-and shipped with the app. A GitHub Action re-runs it daily and commits the result.
+and shipped with the app. A scheduled task on a home machine re-runs it every other day and commits
+the result (§26 — it was a GitHub Action, and could never have worked there).
 
 **Why, in order of importance:**
 
@@ -868,7 +869,8 @@ daily, since 4 Oct. On 11 Nov the site was still serving the snapshot generated 
 `git log -- src/data/events.json` showed three commits, all hand-made. The bot had never committed
 anything.
 
-Three faults, each sufficient on its own:
+Four faults. The first three were each sufficient on their own; the fourth decided where the
+refresh runs at all:
 
 **The workflow was disabled.** `gh workflow list --all` reported `disabled_manually`. No run of any
 kind since 22 Oct.
@@ -907,19 +909,52 @@ Four days of drift, measured against a live pull:
 That last one is the argument for the whole mechanism. A calendar that is 97% right is not 97% as
 useful as a correct one; it is a calendar you cannot trust, which is the same as not having one.
 
-### The fix
+### A fourth fault, which decided the design: BYU does not answer GitHub
 
-Node pinned to 24, the pull step changed to `npm run build:data`, `actions/checkout` and
-`setup-node` to v5 (their v4 Node-20 runtime is already forced onto 24 with a deprecation warning),
-and the workflow re-enabled. The commit message now counts real events rather than all of them, so
-a run that silently dropped the stand-ins would announce a count that didn't move.
+Pinning Node 24 and switching the pull to `npm run build:data` were both necessary, and neither
+was sufficient. With smoke finally able to *run* on CI, a dispatched run surfaced what had been
+hidden underneath it the whole time:
 
-**The guardrail that was missing is a smoke check that the gate itself runs somewhere real.** There
-is no good source-level assertion for "CI uses a Node version that can run these checks" — it is a
-property of the workflow file, not the app. What there now is instead: the workflow is exercised by
-`workflow_dispatch` after any change to it, and a failed scheduled run is visible in
-`gh run list`. If this recurs, the tell is the same one that found it — `git log` on the snapshot
-showing no bot commits.
+```
+! skipped 2026-11-11..2026-11-18: window 2026-11-11: HTTP 403
+...
+byu_calendar: 0 rows from 0 windows
+Wrote 2 unique events to src/data/events.json
+```
+
+All 39 windows, 403. The CloudFront behaviour this file already records as the reason the snapshot
+is committed rather than fetched at runtime (§3) applies to GitHub's runner ranges too. The
+workflow had been built on the assumption that Actions was somehow exempt, and that assumption was
+never tested, because for three weeks the job died before it could be.
+
+The gate did its job: smoke failed four filter checks against a 2-event snapshot and the commit
+step never ran. Nothing reached production. That part worked exactly as designed.
+
+So the refresh cannot live on GitHub. It now runs from a machine BYU will answer —
+`scripts/refresh-snapshot.ps1`, driven by a Windows scheduled task every other day. The workflow
+file is deleted rather than left disabled, because a recipe that cannot work is worse than no
+recipe at all: the next person to find it would re-enable it and get silence.
+
+**Every other day, not daily.** The feed changes a few times a day at most, a refresh costs 39
+requests, and what this protects against is a snapshot drifting for weeks — not for 36 hours. The
+daily cadence was also generating a failure email every morning while the transport was broken.
+
+The script's own gate is `npm run smoke`, and a failure there restores the snapshot from git rather
+than leaving it in the working tree. `fetch-events.mjs` skips a window it cannot read and carries
+on, so a blocked or flaky pull yields a structurally valid but gutted file; without the restore, a
+bad pull would sit there waiting to be swept into somebody's next manual commit.
+
+### Why a stale snapshot is worse than it sounds
+
+The Baylor kickoff is the whole argument. On 7 Nov the feed had it at 20:15. On 11 Nov the same
+record read 13:30 — same `EventId`, same URL, same title, same venue. BYU had edited the time in
+place, by 6h45m, three days out, on the most-attended event in the window.
+
+And **the API exposes no modification metadata whatsoever** — no `modified`, `updated`, `etag` or
+`created` field on any record. There is no way to ask what changed. The only way to learn that an
+event moved is to pull the window again and diff it, which makes freshness not a nicety but the
+only error-correction this design has. A snapshot that stops refreshing does not decay visibly; it
+silently preserves whatever happened to be true on the day it was taken, and looks fine doing it.
 
 ### Known cliff: the stand-ins expire on 19 Dec 2026
 
