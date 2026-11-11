@@ -41,7 +41,9 @@ jobs:
           npm run smoke
           npm run build
 
-      # Nothing to commit is the normal outcome on a quiet day, not a failure.
+      # `generatedAt` moves on every pull, so this commits daily even when no event changed.
+      # That is deliberate: /feed.ics advertises the snapshot date to subscribed calendars, and a
+      # date that stops moving is indistinguishable from the outage this workflow exists to end.
       - name: Commit if changed
         run: |
           git config user.name  'github-actions[bot]'
