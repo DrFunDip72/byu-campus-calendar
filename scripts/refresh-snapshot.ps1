@@ -25,10 +25,12 @@ $log = Join-Path $logDir 'refresh.log'
 
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
 
+# Writes to the log only, never to the pipeline. Say used to Write-Output as well, which meant
+# Run returned [the label line, the exit code] instead of the exit code -- so "-ne 0" was true on
+# an array of two and every step reported failure, including a clean "Already up to date."
 function Say($msg) {
   $line = '{0}  {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $msg
   Add-Content -Path $log -Value $line -Encoding utf8
-  Write-Output $line
 }
 
 # Runs a command with all its output appended to the log by cmd, not PowerShell. PS 5.1 wraps a
@@ -37,7 +39,9 @@ function Say($msg) {
 function Run($label, $command) {
   Say "> $label"
   cmd /c "$command >> $log 2>&1"
-  return $LASTEXITCODE
+  $code = $LASTEXITCODE
+  Say "  $label exited $code"
+  return $code
 }
 
 function Restore() {
