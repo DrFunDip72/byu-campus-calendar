@@ -75,12 +75,13 @@ page.
 
 ### The events marked DEMO
 
-The snapshot is **476 real BYU events plus 20 clearly-badged stand-ins**. The stand-ins exist
+The snapshot is **~470 real BYU events plus 20 clearly-badged stand-ins**, re-pulled daily. The
+stand-ins exist
 because of a chicken-and-egg problem: BYU's public feed carries zero hackathons, zero conferences,
 and a single undifferentiated `clubs` bucket with no way to follow a named association — so the
 headline feature had almost nothing real to filter. Adding nothing would make the feature look
 pointless; adding them silently would overstate the data. They are labelled on every card, counted
-separately in the About panel, and excluded from the 476. See `scripts/seed-demo.mjs`.
+separately in the About panel, and excluded from the real-event count. See `scripts/seed-demo.mjs`.
 
 Full reasoning, rejected alternatives and every trade-off: **[`docs/DECISIONS.md`](docs/DECISIONS.md)**.
 
@@ -258,7 +259,7 @@ home-screen slot alongside it argues against the pitch.
 Stated in the app under the info icon, and in detail in `docs/DECISIONS.md`:
 
 - **Club and association events** — the public API has no *vocabulary* for them: zero hackathons
-  across all 476 real records, and `clubs` is one flat bucket of ~15 with no way to follow a named
+  across every real record, and `clubs` is one flat bucket of ~15 with no way to follow a named
   association. **BYU's own mobile app does carry them, with a dedicated Club field** (Marketing
   Association, Pre-Nursing, Cybersecurity Students Academic Association, Investment Banking
   Association). The data already exists inside BYU. The ask is not "get clubs to publish" — it is

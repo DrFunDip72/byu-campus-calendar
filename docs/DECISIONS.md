@@ -633,7 +633,8 @@ audience to mislead.
   strip being on screen. The smoke suite asserts both halves — that the banner carries a
   dismiss control, and that stand-ins are still labelled without it.
 - A dedicated section in the About panel explaining why they exist.
-- Excluded from the headline figure everywhere. The number quoted publicly is **476 real events**.
+- Excluded from the headline figure everywhere. The number quoted publicly is the real count only,
+  which moves daily with the feed -- the app derives it, so no figure is hardcoded in the UI.
 
 **The clubs chosen are not invented from nothing.** They are ones BYU's own mobile app already
 lists — Marketing Association, Pre-Nursing, Cybersecurity, Investment Banking — which is what makes
@@ -856,3 +857,76 @@ nothing sent.
 The general lesson, and the third time this project has hit it: **two controls for one piece of
 state will drift** (§23), and **one control that is sometimes absent is worse than either**. When a
 single element is the whole route into a feature, nothing about its presence should be computed.
+
+---
+
+## 26. The refresh that never ran
+
+The snapshot is committed, not fetched at runtime (§3), which buys reliability at the cost of a
+dependency: something has to re-pull it. `.github/workflows/refresh-events.yml` was supposed to,
+daily, since 4 Oct. On 11 Nov the site was still serving the snapshot generated on 7 Nov, and
+`git log -- src/data/events.json` showed three commits, all hand-made. The bot had never committed
+anything.
+
+Three faults, each sufficient on its own:
+
+**The workflow was disabled.** `gh workflow list --all` reported `disabled_manually`. No run of any
+kind since 22 Oct.
+
+**Every run before that failed.** All fifteen, identically, at `npm run smoke`:
+
+```
+TypeError: webidl.util.markAsUncloneable is not a function
+    at new CacheStorage (node_modules/undici/lib/web/cache/cachestorage.js:20:17)
+Node.js v20.20.2
+```
+
+jsdom's bundled undici calls a `webidl` helper that Node 20 does not provide. The workflow pinned
+`node-version: 20`; the machine the checks were written on runs 24. The gate therefore passed
+locally and crashed remotely on every run — the worst shape for a failure, because the thing that
+was supposed to catch problems was itself the problem, and the fetch step above it was working
+fine the whole time.
+
+**And it would have deleted the stand-ins if it had worked.** The pull step ran
+`node scripts/fetch-events.mjs`, which rewrites `events.json` from scratch. The 20 badged demo
+events are merged in afterwards by `seed-demo.mjs`; `npm run build:data` exists to run both in
+order, and the workflow did not use it. A successful run would have committed a snapshot with
+`demo: 0` — taking the DEMO banner, the club-following demo and the entire taxonomy finding off
+the site, silently, while reporting success. This fault was invisible precisely *because* of the
+second one: the only thing preventing it was that the job never got that far.
+
+### What the staleness actually cost
+
+Four days of drift, measured against a live pull:
+
+- 21 events gone, all of them already past — correct churn.
+- 15 events missing that the live feed carries, including AI Day and several Kennedy Center talks.
+- **Football vs. Baylor had moved from 8:15pm to 1:30pm.** The site was advertising the wrong time,
+  by nearly seven hours, for the most-attended event in its window, three days out.
+
+That last one is the argument for the whole mechanism. A calendar that is 97% right is not 97% as
+useful as a correct one; it is a calendar you cannot trust, which is the same as not having one.
+
+### The fix
+
+Node pinned to 24, the pull step changed to `npm run build:data`, `actions/checkout` and
+`setup-node` to v5 (their v4 Node-20 runtime is already forced onto 24 with a deprecation warning),
+and the workflow re-enabled. The commit message now counts real events rather than all of them, so
+a run that silently dropped the stand-ins would announce a count that didn't move.
+
+**The guardrail that was missing is a smoke check that the gate itself runs somewhere real.** There
+is no good source-level assertion for "CI uses a Node version that can run these checks" — it is a
+property of the workflow file, not the app. What there now is instead: the workflow is exercised by
+`workflow_dispatch` after any change to it, and a failed scheduled run is visible in
+`gh run list`. If this recurs, the tell is the same one that found it — `git log` on the snapshot
+showing no bot commits.
+
+### Known cliff: the stand-ins expire on 19 Dec 2026
+
+`seed-demo.mjs` hardcodes its dates -- every seeded start is built as
+`2026-<MM-DD>T<HH:MM>:00-07:00` -- spanning 7 Nov to 19 Dec. Two were already past on 11 Nov.
+After 19 Dec every stand-in is in the past, the club-following demo goes empty, and the daily
+refresh will roll the real events forward around them without complaint. The timezone is hardcoded
+to MST too, so anything seeded past 8 Mar 2027 would be an hour off. Anchoring the seeds to
+"today + N days" at seed time is the fix; it is not done yet because the seeds are hand-written
+to sit on plausible weekdays.
