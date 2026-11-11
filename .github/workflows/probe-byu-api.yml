@@ -1,0 +1,45 @@
+# Throwaway diagnostic: is calendar.byu.edu's 403 from a GitHub runner about the IP or the headers?
+#
+# The daily refresh pulls fine from a home connection and gets 403 on all 39 windows from Actions.
+# This prints the status code for the same URL under several header combinations so the answer is
+# measured rather than guessed. Delete once the question is settled.
+name: Probe BYU API from a runner
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Who are we, from the outside
+        run: curl -s --max-time 20 https://api.ipify.org; echo
+
+      - name: Status under each header set
+        run: |
+          URL='https://calendar.byu.edu/api/Events.json?categories=all&event%5Bmin%5D%5Bdate%5D=2026-11-18&event%5Bmax%5D%5Bdate%5D=2026-11-25'
+
+          probe () {
+            printf '%-28s -> ' "$1"; shift
+            curl -s -o /tmp/body -w '%{http_code}' --max-time 25 "$@" "$URL" || echo -n 'curl-error'
+            printf '  (%s bytes)\n' "$(wc -c < /tmp/body | tr -d ' ')"
+          }
+
+          probe 'no headers at all'
+          probe 'the project UA' -H 'user-agent: byu-campus-calendar/1.0 (+student project)' -H 'accept: application/json'
+          probe 'curl default UA' -H 'accept: application/json'
+          probe 'a desktop browser UA' \
+            -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36' \
+            -H 'accept: application/json, text/plain, */*' \
+            -H 'accept-language: en-US,en;q=0.9'
+          probe 'browser UA + referer' \
+            -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36' \
+            -H 'accept: application/json, text/plain, */*' \
+            -H 'accept-language: en-US,en;q=0.9' \
+            -H 'referer: https://calendar.byu.edu/'
+
+          echo '--- what the block actually says ---'
+          curl -s --max-time 25 -D - -o /dev/null "$URL" | head -20
+
+      - name: Does the plain HTML calendar page load at all
+        run: curl -s -o /dev/null -w 'calendar.byu.edu/ -> %{http_code}\n' --max-time 25 https://calendar.byu.edu/
